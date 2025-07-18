@@ -1,5 +1,4 @@
 flet
-sqlite3
 datetime
 asyncio
 os
