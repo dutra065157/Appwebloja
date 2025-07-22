@@ -1,222 +1,277 @@
 import flet as ft
-import sqlite3
 from datetime import datetime
 import asyncio
 import os
 import traceback
-from pathlib import Path
-import sys
-import shutil
+import psycopg2
+from psycopg2 import sql
+from psycopg2.extras import RealDictCursor
+import logging
+from dotenv import load_dotenv
+load_dotenv()
+
+# Configurar logging
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+logging.basicConfig(level=logging.INFO)
 
 # ==============================================================
-# CONFIGURAÇÃO DO BANCO DE DADOS
+# CONFIGURAÇÃO DO BANCO DE DADOS (POSTGRESQL)
 # ==============================================================
 
-def get_db_path():
-    """Obtém o caminho do banco de dados considerando ambiente executável"""
-    if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        base_dir = os.path.dirname(__file__)
-
-    db_dir = os.path.join(base_dir, "data")
-    os.makedirs(db_dir, exist_ok=True)
-    return os.path.join(db_dir, "dadosloja.db")
-
-DB_PATH = get_db_path()
+def get_connection():
+    """Estabelece conexão com o banco PostgreSQL"""
+    try:
+        # Render usa essa variável de ambiente por padrão
+        DATABASE_URL = os.environ['DATABASE_URL']
+        
+        # Ajuste necessário para conexão SSL
+        if DATABASE_URL.startswith("postgres://"):
+            DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+            
+        conn = psycopg2.connect(
+            DATABASE_URL,
+            sslmode='require',
+            cursor_factory=RealDictCursor
+        )
+        logging.info("Conexão com PostgreSQL estabelecida com sucesso!")
+        return conn
+    except Exception as e:
+        logging.error(f"Erro ao conectar ao PostgreSQL: {str(e)}")
+        raise
 
 def criar_banco():
     """Cria as tabelas do banco de dados se não existirem"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
 
-    # Tabela de produtos
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS produtos (
-        codigo TEXT PRIMARY KEY,
-        nome TEXT NOT NULL,
-        preco REAL NOT NULL,
-        quantidade INTEGER NOT NULL,
-        categoria TEXT NOT NULL,
-        descricao TEXT,
-        data_cadastro TEXT NOT NULL,
-        image_path TEXT
-    )
-    ''')
+        # Tabela de produtos
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS produtos (
+            codigo TEXT PRIMARY KEY,
+            nome TEXT NOT NULL,
+            preco NUMERIC NOT NULL,
+            quantidade INTEGER NOT NULL,
+            categoria TEXT NOT NULL,
+            descricao TEXT,
+            data_cadastro TEXT NOT NULL,
+            image_path TEXT
+        )
+        ''')
 
-    # Tabela de vendas
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS vendas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        data_venda TEXT NOT NULL,
-        total REAL NOT NULL,
-        forma_pagamento TEXT NOT NULL,
-        valor_recebido REAL,
-        troco REAL
-    )
-    ''')
+        # Tabela de vendas
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS vendas (
+            id SERIAL PRIMARY KEY,
+            data_venda TEXT NOT NULL,
+            total NUMERIC NOT NULL,
+            forma_pagamento TEXT NOT NULL,
+            valor_recebido NUMERIC,
+            troco NUMERIC
+        )
+        ''')
 
-    # Tabela de itens vendidos
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS itens_vendidos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        venda_id INTEGER NOT NULL,
-        produto_codigo TEXT NOT NULL,
-        nome TEXT NOT NULL,
-        preco_unitario REAL NOT NULL,
-        quantidade INTEGER NOT NULL,
-        subtotal REAL NOT NULL,
-        FOREIGN KEY (venda_id) REFERENCES vendas(id),
-        FOREIGN KEY (produto_codigo) REFERENCES produtos(codigo)
-    )
-    ''')
+        # Tabela de itens vendidos
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS itens_vendidos (
+            id SERIAL PRIMARY KEY,
+            venda_id INTEGER NOT NULL REFERENCES vendas(id),
+            produto_codigo TEXT NOT NULL REFERENCES produtos(codigo),
+            nome TEXT NOT NULL,
+            preco_unitario NUMERIC NOT NULL,
+            quantidade INTEGER NOT NULL,
+            subtotal NUMERIC NOT NULL
+        )
+        ''')
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        logging.info("Tabelas criadas/verificadas com sucesso!")
+    except Exception as e:
+        logging.error(f"Erro ao criar tabelas: {str(e)}")
+        raise
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
 
 def salvar_produto_db(produto):
     """Salva ou atualiza um produto no banco de dados"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
-
-    cursor.execute('''
-        INSERT OR REPLACE INTO produtos
-        (codigo, nome, preco, quantidade, categoria,
-         descricao, data_cadastro, image_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        produto['codigo'],
-        produto['nome'],
-        produto['preco'],
-        produto['quantidade'],
-        produto['categoria'],
-        produto['descricao'],
-        datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        produto.get('image_path', '')
-    ))
-
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute('''
+            INSERT INTO produtos
+            (codigo, nome, preco, quantidade, categoria, descricao, data_cadastro, image_path)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (codigo) DO UPDATE SET
+                nome = EXCLUDED.nome,
+                preco = EXCLUDED.preco,
+                quantidade = EXCLUDED.quantidade,
+                categoria = EXCLUDED.categoria,
+                descricao = EXCLUDED.descricao,
+                data_cadastro = EXCLUDED.data_cadastro,
+                image_path = EXCLUDED.image_path
+        ''', (
+            produto['codigo'],
+            produto['nome'],
+            produto['preco'],
+            produto['quantidade'],
+            produto['categoria'],
+            produto['descricao'],
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            produto.get('image_path', '')
+        ))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"Erro ao salvar produto: {str(e)}")
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 def buscar_produtos_db(filtro=None):
     """Busca produtos no banco de dados com filtro opcional"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
-
-    if filtro:
-        cursor.execute('''
-            SELECT * FROM produtos
-            WHERE codigo LIKE ? OR nome LIKE ?
-            ORDER BY nome
-        ''', (f'%{filtro}%', f'%{filtro}%'))
-    else:
-        cursor.execute('SELECT * FROM produtos ORDER BY nome')
-
-    produtos = cursor.fetchall()
-    conn.close()
-    return produtos
+    try:
+        if filtro:
+            cursor.execute('''
+                SELECT * FROM produtos
+                WHERE codigo ILIKE %s OR nome ILIKE %s
+                ORDER BY nome
+            ''', (f'%{filtro}%', f'%{filtro}%'))
+        else:
+            cursor.execute('SELECT * FROM produtos ORDER BY nome')
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
 def buscar_produto_db(codigo):
     """Busca um produto específico pelo código"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM produtos WHERE codigo = ?', (codigo,))
-    produto = cursor.fetchone()
-    conn.close()
-    return produto
+    try:
+        cursor.execute('SELECT * FROM produtos WHERE codigo = %s', (codigo,))
+        return cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
 
 def excluir_produto_db(codigo):
     """Exclui um produto do banco de dados"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM produtos WHERE codigo = ?', (codigo,))
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute('DELETE FROM produtos WHERE codigo = %s', (codigo,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"Erro ao excluir produto: {str(e)}")
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 def atualizar_estoque_db(codigo, quantidade):
     """Atualiza o estoque de um produto"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('''
-    UPDATE produtos
-    SET quantidade = quantidade + ?
-    WHERE codigo = ?
-    ''', (quantidade, codigo))
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute('''
+        UPDATE produtos
+        SET quantidade = quantidade + %s
+        WHERE codigo = %s
+        ''', (quantidade, codigo))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"Erro ao atualizar estoque: {str(e)}")
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 def registrar_venda_db(venda, itens):
     """Registra uma venda e seus itens no banco de dados"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
-
-    # Insere a venda principal
-    cursor.execute('''
-    INSERT INTO vendas
-    (data_venda, total, forma_pagamento, valor_recebido, troco)
-    VALUES (?, ?, ?, ?, ?)
-    ''', (
-        venda['data_venda'],
-        venda['total'],
-        venda['forma_pagamento'],
-        venda.get('valor_recebido'),
-        venda.get('troco')
-    ))
-
-    venda_id = cursor.lastrowid
-
-    # Insere os itens vendidos
-    for item in itens:
+    try:
+        # Insere a venda principal
         cursor.execute('''
-        INSERT INTO itens_vendidos
-        (venda_id, produto_codigo, nome, preco_unitario, quantidade, subtotal)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO vendas
+        (data_venda, total, forma_pagamento, valor_recebido, troco)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id
         ''', (
-            venda_id,
-            item['codigo'],
-            item['nome'],
-            item['preco'],
-            item['quantidade'],
-            item['subtotal']
+            venda['data_venda'],
+            venda['total'],
+            venda['forma_pagamento'],
+            venda.get('valor_recebido'),
+            venda.get('troco')
         ))
+        venda_id = cursor.fetchone()['id']
 
-    conn.commit()
-    conn.close()
-    return venda_id
+        # Insere os itens vendidos
+        for item in itens:
+            cursor.execute('''
+            INSERT INTO itens_vendidos
+            (venda_id, produto_codigo, nome, preco_unitario, quantidade, subtotal)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ''', (
+                venda_id,
+                item['codigo'],
+                item['nome'],
+                item['preco'],
+                item['quantidade'],
+                item['subtotal']
+            ))
+
+        conn.commit()
+        return venda_id
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"Erro ao registrar venda: {str(e)}")
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
 def obter_dados_estoque():
     """Obtém os produtos com maior estoque para relatórios"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
-
-    cursor.execute('''
-        SELECT nome, quantidade
-        FROM produtos
-        ORDER BY quantidade DESC
-        LIMIT 5
-    ''')
-
-    dados = cursor.fetchall()
-    conn.close()
-    return dados
+    try:
+        cursor.execute('''
+            SELECT nome, quantidade
+            FROM produtos
+            ORDER BY quantidade DESC
+            LIMIT 5
+        ''')
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
 def obter_dados_vendas_por_categoria():
     """Obtém as vendas por categoria para relatórios"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cursor = conn.cursor()
-
-    cursor.execute('''
-        SELECT p.categoria, SUM(iv.quantidade) as total_vendido
-        FROM itens_vendidos iv
-        JOIN produtos p ON iv.produto_codigo = p.codigo
-        GROUP BY p.categoria
-        ORDER BY total_vendido DESC
-        LIMIT 5
-    ''')
-
-    dados = cursor.fetchall()
-    conn.close()
-    return dados
+    try:
+        cursor.execute('''
+            SELECT p.categoria, SUM(iv.quantidade) as total_vendido
+            FROM itens_vendidos iv
+            JOIN produtos p ON iv.produto_codigo = p.codigo
+            GROUP BY p.categoria
+            ORDER BY total_vendido DESC
+            LIMIT 5
+        ''')
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
 # ==============================================================
 # FUNÇÕES AUXILIARES E ESTADO DA APLICAÇÃO
@@ -1497,12 +1552,6 @@ def main(page: ft.Page):
     # ==============================================================
 
     # Monta a página inicial
-    page.add(
-        ft.Image(
-            src_base64="iVBORw0KGgoAAAANSUhEUgAAABkAAAAgCAYAAADnnNMGAAAACXBIWXMAAAORAAADkQFnq8zdAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAA6dJREFUSImllltoHFUYx3/fzOzm0lt23ZrQ1AQbtBehNpvQohgkBYVo410RwQctNE3Sh0IfiiBoIAjqi6TYrKnFy4O3oiiRavDJFi3mXomIBmOxNZe63ay52GR3Zj4f2sTEzmx3m//TYf7/c35zvgPnO6KqrESXqpq3muocAikv6m+/zytj3ejik1VN21G31YA9CgJ6xC+bMyQZPVCuarciPAMYC99V6Vw5pLbFSibHmlVoRVj9P3cmPBM8tSJI/M6mzabpfoAQ9fIF7WK4bd5vvuFnLGgy2vi0abg94A0AcJGvMq3hDxGRyar9r4F+iLAm0yIiRk8m37tctS1WsrIhhrI30+Srmg+J87OXUf3lWGS1q89dC6ltsSanxk4Aj2QBABii96300g87P/rtlrWr8l+vyDMfdlXSyyEikqxsiOUAQJCBhfHdXRfCq1LSsSlcWG+KBAGStvvrMkgiuv8lUc2mREukPwLUfHG+uTQv8Eown7VL3XlbBxYhf1c17hbVF3MDwA9bts280TnaU1YYqPby07aeFlUlHt27wSQ4CLo+F8AvoTCvHmyKF+ZbEb/M77P2LgvAwmrTHAHflN3KZxVbMC2jMFNOpgPnrMSOhvvFkMezXdwV4ePbtvHtxnJAMQ0j4JtVnO+eLb5oiSlt5HDbv7t1O90lpYCCCKbhfzW5kAIwUAazR0BlfII8Ow0I6uoVmI9MyAMwbMs8CExmDbk4zgu931MyO4OI4KrYflkRjOoTI+uM9d1vjotwKPu9QMk/sxzuO8POiVFcdZ1M2YBVsMEAKOqLvaPIe7mACuw0z/80SMH58SMplxlfiDhVi7dw2pltRhjKBQTQdrSja2KKTfE551NHuaZ0QVPvWYQUn31/Vm2nDvgjF4grVJx6suSvrvrSJ/6cSW2Oz9mf264uNrB806xZ1k/CZ49dUKgDEtlCROX2hfHpx8pGuuo3PpqYulw8fjndOp1yhgtNKRevJ1FyR2Ola+jXAjdnwTkZ6o896GdWdxDw7IxFg+0DpmXchTKSBWQnIuJn9u4j7dt+13UfHXEkXQOcuQ4kMhVtqsgUyPiQiPQfHw1NB2sRjmXKuTg1NwwBYLhtPtQX26eqTwGXPDOqvmcC4Hnwfrrad94GrVsOYTqUTkQY+iTlNe/6O1miSP/x0VB/+wMIDwHn/vtV1iQC4Xv95uUEWVCoL9Y5Z+gdovoyMHUFJHv88jmVy0vTuw7cZNv2YaA61Bfb7ZX5F8SaUv2xwZevAAAAAElFTkSuQmCC"
-        )
-    )
-    page.add(ft.Image(src=f"/imagens/ft.png"))
     page.add(header)
     page.add(ft.Row([
         ft.Column([secao_carrinho, form_busca, image_preview,busca_image_preview], expand=2),
@@ -1515,14 +1564,17 @@ def main(page: ft.Page):
     atualizar_seletor_produtos()
     page.update()
 
-
-
-
+# Configuração para Render
 port = int(os.environ.get("PORT", 8000))
-criar_banco()
+
+
+
+
+if __name__== "__main__":
+    criar_banco()
 ft.app(
     target=main,
     port=port,
-    host="0.0.0.0",  # Fundamental para Render!
+    host="0.0.0.0",
     view=ft.WEB_BROWSER
 )
