@@ -132,33 +132,89 @@ def salvar_produto_db(produto):
         conn.close()
 
 def buscar_produtos_db(filtro=None):
-    """Busca produtos no banco de dados com filtro opcional"""
+    """Busca produtos no banco de dados com filtro opcional e conversão de tipos segura"""
     conn = get_connection()
     cursor = conn.cursor()
     try:
         if filtro:
             cursor.execute('''
-                SELECT * FROM produtos
+                SELECT 
+                    codigo, 
+                    nome, 
+                    preco::FLOAT,  -- Conversão explícita para float
+                    quantidade::INTEGER,  -- Conversão explícita para inteiro
+                    categoria,
+                    descricao,
+                    image_path
+                FROM produtos
                 WHERE codigo ILIKE %s OR nome ILIKE %s
                 ORDER BY nome
             ''', (f'%{filtro}%', f'%{filtro}%'))
         else:
-            cursor.execute('SELECT * FROM produtos ORDER BY nome')
-        return cursor.fetchall()
+            cursor.execute('''
+                SELECT 
+                    codigo, 
+                    nome, 
+                    preco::FLOAT, 
+                    quantidade::INTEGER,
+                    categoria,
+                    descricao,
+                    image_path
+                FROM produtos 
+                ORDER BY nome
+            ''')
+        
+        # Converter para lista de dicionários com tipos garantidos
+        colunas = [desc[0] for desc in cursor.description]
+        produtos = []
+        for row in cursor.fetchall():
+            produto = dict(zip(colunas, row))
+            # Garantir conversão numérica mesmo se o cast do PostgreSQL falhar
+            produto['preco'] = float(produto['preco'])
+            produto['quantidade'] = int(produto['quantidade'])
+            produtos.append(produto)
+            
+        return produtos
     finally:
         cursor.close()
         conn.close()
 
+
+
 def buscar_produto_db(codigo):
-    """Busca um produto específico pelo código"""
+    """Busca um único produto por código com conversão segura"""
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute('SELECT * FROM produtos WHERE codigo = %s', (codigo,))
-        return cursor.fetchone()
+        cursor.execute('''
+            SELECT 
+                codigo, 
+                nome, 
+                preco::FLOAT,
+                quantidade::INTEGER,
+                categoria,
+                descricao,
+                image_path
+            FROM produtos 
+            WHERE codigo = %s
+        ''', (codigo,))
+        
+        colunas = [desc[0] for desc in cursor.description]
+        row = cursor.fetchone()
+        
+        if not row:
+            return None
+            
+        produto = dict(zip(colunas, row))
+        # Conversão redundante para garantir tipos
+        produto['preco'] = float(produto['preco'])
+        produto['quantidade'] = int(produto['quantidade'])
+        
+        return produto
     finally:
         cursor.close()
         conn.close()
+
 
 def excluir_produto_db(codigo):
     """Exclui um produto do banco de dados"""
@@ -414,12 +470,12 @@ def main(page: ft.Page):
         tabela_produtos.rows = [
             ft.DataRow(
                 cells=[
-                    ft.DataCell(ft.Text(p[0], weight=ft.FontWeight.BOLD)),
-                    ft.DataCell(ft.Text(p[1])),
-                    ft.DataCell(ft.Text(f"R$ {p[2]:.2f}", color=ft.Colors.GREEN)),
-                    ft.DataCell(ft.Text(str(p[3]), 
-                               color=ft.Colors.RED if p[3] < 5 else ft.Colors.BLACK)),
-                    ft.DataCell(ft.Text(p[4].capitalize(), 
+                    ft.DataCell(ft.Text(p['codigo'], weight=ft.FontWeight.BOLD)),
+                    ft.DataCell(ft.Text(p['nome'])),
+                    ft.DataCell(ft.Text(f"R$ {p['preco']:.2f}", color=ft.Colors.GREEN)),
+                    ft.DataCell(ft.Text(str(p['quantidade']), 
+                               color=ft.Colors.RED if p['quantidade'] < 5 else ft.Colors.BLACK)),
+                    ft.DataCell(ft.Text(p['categoria'].capitalize(), 
                                color=ft.Colors.BLUE_700)),
                     ft.DataCell(
                         ft.Row([
@@ -427,18 +483,18 @@ def main(page: ft.Page):
                                 ft.Icons.REMOVE_RED_EYE,
                                 icon_color=ft.Colors.BLUE_700,
                                 tooltip="Visualizar",
-                                on_click=lambda e, cod=p[0]: mostrar_modal_produto(cod)
+                                on_click=lambda e, cod=p['codigo']: mostrar_modal_produto(cod)
                             ),
                             ft.IconButton(
                                 ft.Icons.DELETE,
                                 icon_color=ft.Colors.RED_700,
                                 tooltip="Excluir",
-                                on_click=lambda e, cod=p[0]: confirmar_exclusao(cod)
+                                on_click=lambda e, cod=p['codigo']: confirmar_exclusao(cod)
                             ),
                         ], spacing=5)
                     ),
                 ],
-                on_select_changed=lambda e, cod=p[0]: selecionar_produto(cod),
+                on_select_changed=lambda e, cod=p['codigo']: selecionar_produto(cod),
                 color=ft.Colors.GREY_100 if idx % 2 == 0 else None
             ) for idx, p in enumerate(produtos)
         ]
@@ -459,8 +515,8 @@ def main(page: ft.Page):
         produtos = buscar_produtos_db()
         seletor_produto.options = [
             ft.dropdown.Option(
-                p[0],
-                f"{p[1]} (R$ {p[2]:.2f})"
+                p['codigo'],
+                f"{p['nome']} (R$ {p['preco']:.2f})"
             ) for p in produtos
         ]
         page.update()
@@ -480,21 +536,34 @@ def main(page: ft.Page):
         page.update()
 
     def cadastrar_produto(e):
-        """Salva um novo produto ou atualiza um existente"""
-        campos_obrigatorios = [codigo_produto, nome_produto, 
-                              preco_produto, quantidade_produto]
+
+        """Salva um novo produto ou atualiza um existente com tratamento de números"""
+        campos_obrigatorios = [codigo_produto, nome_produto, preco_produto, quantidade_produto]
         
-        if any(not campo.value for campo in campos_obrigatorios):
+        # Verificação robusta de campos obrigatórios
+        if any(not campo.value or not campo.value.strip() for campo in campos_obrigatorios):
             mostrar_mensagem(page, "Preencha todos os campos obrigatórios!", ft.Colors.RED)
             return
 
         try:
+            # Conversão segura de valores numéricos com tratamento de vírgulas
+            preco_valor = float(preco_produto.value.replace(',', '.').strip())
+            quantidade_valor = int(quantidade_produto.value.strip())
+            
+            # Validação de valores positivos
+            if preco_valor <= 0:
+                mostrar_mensagem(page, "Preço deve ser maior que zero!", ft.Colors.RED)
+                return
+            if quantidade_valor < 0:
+                mostrar_mensagem(page, "Quantidade não pode ser negativa!", ft.Colors.RED)
+                return
+
             produto = {
                 'codigo': codigo_produto.value.strip(),
                 'nome': nome_produto.value.strip(),
-                'preco': float(preco_produto.value),
-                'quantidade': int(quantidade_produto.value),
-                'categoria': categoria_produto.value if categoria_produto.value else "outros",
+                'preco': preco_valor,  # Usando o valor convertido para float
+                'quantidade': quantidade_valor,  # Usando o valor convertido para int
+                'categoria': categoria_produto.value.strip() if categoria_produto.value else "outros",
                 'descricao': descricao_produto.value.strip() if descricao_produto.value else "",
                 'image_path': state.uploaded_image_path
             }
@@ -504,23 +573,29 @@ def main(page: ft.Page):
             atualizar_tabela_produtos()
             atualizar_seletor_produtos()
             mostrar_mensagem(page, "✅ Produto salvo com sucesso!")
+            
+            # Resetar caminho da imagem após cadastro
+            state.uploaded_image_path = ""
+            page.update()
 
         except ValueError:
-            mostrar_mensagem(page, "Preço e quantidade devem ser números válidos!", ft.Colors.RED)
+            mostrar_mensagem(page, "Valores inválidos! Preço deve ser número (ex: 9.99) e quantidade inteiro", ft.Colors.RED)
+        except Exception as ex:
+            mostrar_mensagem(page, f"Erro inesperado: {str(ex)}", ft.Colors.RED)
 
     def selecionar_produto(codigo):
         """Preenche o formulário com dados de um produto existente"""
         produto = buscar_produto_db(codigo)
         if produto:
-            codigo_produto.value = produto[0]
-            nome_produto.value = produto[1]
-            preco_produto.value = str(produto[2])
-            quantidade_produto.value = str(produto[3])
-            categoria_produto.value = produto[4]
-            descricao_produto.value = produto[5] or ""
+            codigo_produto.value = produto['codigo']
+            nome_produto.value = produto['nome']
+            preco_produto.value = str(produto['preco'])
+            quantidade_produto.value = str(produto['quantidade'])
+            categoria_produto.value = produto['categoria']
+            descricao_produto.value = produto['descricao'] or ""
 
-            if produto[7]:
-                state.uploaded_image_path = produto[7]
+            if produto['image_path']:
+                state.uploaded_image_path = produto['image_path']
                 image_preview.src = state.uploaded_image_path
                 image_preview.visible = True
             else:
@@ -551,15 +626,15 @@ def main(page: ft.Page):
         """Exibe modal com detalhes do produto"""
         produto = buscar_produto_db(codigo)
         if produto:
-            modal_codigo.value = produto[0]
-            modal_nome.value = produto[1]
-            modal_preco.value = f"R$ {produto[2]:.2f}"
-            modal_estoque.value = str(produto[3])
-            modal_categoria.value = produto[4].capitalize()
-            modal_descricao.value = produto[5] or "Nenhuma descrição"
+            modal_codigo.value = produto['codigo']
+            modal_nome.value = produto['nome']
+            modal_preco.value = f"R$ {produto['preco']:.2f}"
+            modal_estoque.value = str(produto['quantidade'])
+            modal_categoria.value = produto['categoria'].capitalize()
+            modal_descricao.value = produto['descricao'] or "Nenhuma descrição"
 
-            if produto[7]:
-                modal_image.src = produto[7]
+            if produto['image_path']:
+                modal_image.src = produto['image_path']
                 modal_image.visible = True
             else:
                 modal_image.visible = False
@@ -603,8 +678,8 @@ def main(page: ft.Page):
         resultados_busca.controls = [
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.INVENTORY_2, color=ft.Colors.BLUE_700),
-                title=ft.Text(p[1], weight=ft.FontWeight.BOLD),
-                subtitle=ft.Text(f"Código: {p[0]} | Preço: R$ {p[2]:.2f} | Estoque: {p[3]}"),
+                title=ft.Text(p['nome'], weight=ft.FontWeight.BOLD),
+                subtitle=ft.Text(f"Código: {p['codigo']} | Preço: R$ {p['preco']:.2f} | Estoque: {p['quantidade']}"),
                 on_click=lambda e, p=p: selecionar_produto_busca(p),
             ) for p in produtos
         ]
@@ -621,8 +696,8 @@ def main(page: ft.Page):
 
     def selecionar_produto_busca(produto):
         """Mostra imagem do produto na busca"""
-        if produto[7]:  # Índice 7 é o caminho da imagem
-            busca_image_preview.src = produto[7]
+        if produto['image_path']:  # Verifica se há caminho de imagem
+            busca_image_preview.src = produto['image_path']
             busca_image_preview.visible = True
         else:
             busca_image_preview.visible = False
@@ -633,6 +708,7 @@ def main(page: ft.Page):
     # ==============================================================
 
     def adicionar_ao_carrinho(e):
+
         """Adiciona produto ao carrinho de compras"""
         codigo = seletor_produto.value
         if not codigo:
@@ -653,29 +729,45 @@ def main(page: ft.Page):
             mostrar_mensagem(page, "Produto não encontrado", ft.Colors.RED)
             return
 
-        if quantidade > produto[3]:
-            mostrar_mensagem(page, "Quantidade indisponível em estoque", ft.Colors.RED)
+        # CORREÇÃO: Converter quantidade para int
+        estoque_disponivel = int(produto['quantidade'])
+        if quantidade > estoque_disponivel:
+            mostrar_mensagem(page, f"Quantidade indisponível! Estoque: {estoque_disponivel}", ft.Colors.RED)
             return
 
+        # CORREÇÃO: Converter preço para float
+        preco_produto = float(produto['preco'])
+        
         item_existente = next(
             (i for i in state.carrinho if i['codigo'] == codigo), None)
 
         if item_existente:
-            item_existente['quantidade'] += quantidade
-            item_existente['subtotal'] = item_existente['preco'] * item_existente['quantidade']
+            # CORREÇÃO: Usar variável convertida
+            nova_quantidade = item_existente['quantidade'] + quantidade
+            
+            # Verificar estoque novamente considerando quantidade existente
+            if nova_quantidade > estoque_disponivel:
+                mostrar_mensagem(page, 
+                    f"Limite excedido! Você já tem {item_existente['quantidade']} no carrinho",
+                    ft.Colors.ORANGE)
+                return
+                
+            item_existente['quantidade'] = nova_quantidade
+            item_existente['subtotal'] = preco_produto * nova_quantidade
         else:
+            # CORREÇÃO: Usar variáveis convertidas
             state.carrinho.append({
                 'codigo': codigo,
-                'nome': produto[1],
-                'preco': produto[2],
+                'nome': produto['nome'],
+                'preco': preco_produto,
                 'quantidade': quantidade,
-                'subtotal': produto[2] * quantidade
+                'subtotal': preco_produto * quantidade
             })
 
         atualizar_estoque_db(codigo, -quantidade)
         atualizar_carrinho()
         atualizar_tabela_produtos()
-        mostrar_mensagem(page, "🛒 Produto adicionado ao carrinho!")
+        mostrar_mensagem(page, "✅ Produto adicionado ao carrinho!")
         quantidade_compra.value = "1"
         seletor_produto.focus()
         page.update()
@@ -893,7 +985,7 @@ def main(page: ft.Page):
             ft.Colors.GREEN_700
         ]
 
-        max_quantidade = max([quantidade for _, quantidade in dados]) * 1.2
+        max_quantidade = max([p['quantidade'] for p in dados]) * 1.2
 
         return ft.BarChart(
             bar_groups=[
@@ -902,14 +994,14 @@ def main(page: ft.Page):
                     bar_rods=[
                         ft.BarChartRod(
                             from_y=0,
-                            to_y=quantidade,
+                            to_y=p['quantidade'],
                             width=40,
                             color=cores[idx % len(cores)],
-                            tooltip=f"{nome}\nEstoque: {quantidade}",
+                            tooltip=f"{p['nome']}\nEstoque: {p['quantidade']}",
                             border_radius=5
                         )
                     ]
-                ) for idx, (nome, quantidade) in enumerate(dados)
+                ) for idx, p in enumerate(dados)
             ],
             border=ft.border.all(1, ft.Colors.GREY_400),
             left_axis=ft.ChartAxis(
@@ -922,10 +1014,10 @@ def main(page: ft.Page):
                     ft.ChartAxisLabel(
                         value=idx,
                         label=ft.Container(
-                            ft.Text(nome[:15], weight=ft.FontWeight.BOLD),
+                            ft.Text(p['nome'][:15], weight=ft.FontWeight.BOLD),
                             padding=10
                         )
-                    ) for idx, (nome, _) in enumerate(dados)
+                    ) for idx, p in enumerate(dados)
                 ],
                 labels_size=40
             ),
@@ -949,7 +1041,7 @@ def main(page: ft.Page):
         cores = [ft.Colors.PURPLE_700, ft.Colors.INDIGO_700, ft.Colors.BROWN_700,
                  ft.Colors.PINK_700, ft.Colors.CYAN_700]
 
-        max_vendas = max([total for _, total in dados]) * 1.2
+        max_vendas = max([p['total_vendido'] for p in dados]) * 1.2
 
         return ft.BarChart(
             bar_groups=[
@@ -958,14 +1050,14 @@ def main(page: ft.Page):
                     bar_rods=[
                         ft.BarChartRod(
                             from_y=0,
-                            to_y=total,
+                            to_y=p['total_vendido'],
                             width=40,
                             color=cores[idx % len(cores)],
-                            tooltip=f"{categoria}\nVendas: {total} unidades",
+                            tooltip=f"{p['categoria']}\nVendas: {p['total_vendido']} unidades",
                             border_radius=5
                         )
                     ]
-                ) for idx, (categoria, total) in enumerate(dados)
+                ) for idx, p in enumerate(dados)
             ],
             border=ft.border.all(1, ft.Colors.GREY_400),
             left_axis=ft.ChartAxis(
@@ -977,8 +1069,8 @@ def main(page: ft.Page):
                 labels=[
                     ft.ChartAxisLabel(
                         value=idx,
-                        label=ft.Container(ft.Text(categoria[:15], weight=ft.FontWeight.BOLD), padding=10)
-                    ) for idx, (categoria, _) in enumerate(dados)
+                        label=ft.Container(ft.Text(p['categoria'][:15], weight=ft.FontWeight.BOLD), padding=10)
+                    ) for idx, p in enumerate(dados)
                 ],
                 labels_size=40
             ),
@@ -1085,7 +1177,7 @@ def main(page: ft.Page):
         actions=[
             ft.TextButton("Editar", on_click=editar_produto_modal, 
                          style=ft.ButtonStyle(color=ft.Colors.BLUE_700)),
-            ft.TextButton("Excluir",
+            ft.TextButton("Excluir", on_click=lambda e, cod=modal_codigo.value: confirmar_exclusao(cod),
                          style=ft.ButtonStyle(color=ft.Colors.RED_700)),
             ft.TextButton("Fechar", on_click=fechar_modal,
                          style=ft.ButtonStyle(color=ft.Colors.GREY_700))
@@ -1099,26 +1191,26 @@ def main(page: ft.Page):
         width=300, 
         autofocus=True,
         border_color=ft.Colors.BLUE_700,
-        prefix_icon=ft.Icons.LABEL  # Corrigido: prefix_icon em vez de prefix
+        prefix_icon=ft.Icons.LABEL
     )
     nome_produto = ft.TextField(
         label="Nome do Produto", 
         width=300,
         border_color=ft.Colors.BLUE_700,
-        prefix_icon=ft.Icons.LABEL  # Corrigido
+        prefix_icon=ft.Icons.LABEL
     )
     preco_produto = ft.TextField(
         label="Preço Unitário (R$)", 
         width=300, 
         prefix_text="R$ ",
         border_color=ft.Colors.BLUE_700,
-        prefix_icon=ft.Icons.ATTACH_MONEY  # Corrigido
+        prefix_icon=ft.Icons.ATTACH_MONEY
     )
     quantidade_produto = ft.TextField(
         label="Quantidade em Estoque", 
         width=300,
         border_color=ft.Colors.BLUE_700,
-        prefix_icon=ft.Icons.INVENTORY  # Corrigido
+        prefix_icon=ft.Icons.INVENTORY
     )
     categoria_produto = ft.Dropdown(
         label="Categoria",
@@ -1158,7 +1250,7 @@ def main(page: ft.Page):
         width=300, 
         options=[],
         border_color=ft.Colors.BLUE_700,
-        leading_icon=ft.Icons.SHOPPING_BAG  # Corrigido: leading_icon em vez de prefix
+        leading_icon=ft.Icons.SHOPPING_BAG
     )
     quantidade_compra = ft.TextField(
         label="Quantidade", 
@@ -1554,7 +1646,7 @@ def main(page: ft.Page):
     # Monta a página inicial
     page.add(header)
     page.add(ft.Row([
-        ft.Column([secao_carrinho, form_busca, image_preview,busca_image_preview], expand=2),
+        ft.Column([secao_carrinho, form_busca], expand=2),
         ft.Column([Botao_pagina_cadastro], expand=1)
     ], expand=True))
 
@@ -1566,9 +1658,6 @@ def main(page: ft.Page):
 
 # Configuração para Render
 port = int(os.environ.get("PORT", 8000))
-
-
-
 
 if __name__== "__main__":
     criar_banco()
