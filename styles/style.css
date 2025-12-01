@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #ffffff; /* Cor de fundo padrão branca */
+}
+
+.gradient-bg {
+    /* Gradiente padrão usado no cabeçalho e banner, vindo do index.html */
+    background: linear-gradient(135deg, #fdf2f8 0%, #f0f9ff 100%);
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.nav-link:hover {
+    color: #FF6B8B;
+}
+
+.cart-item:hover {
+    background-color: #FFF0F3;
+}
+
+/* Animações */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* Utilitário para limitar texto a 2 linhas */
+.line-clamp-2 {
+    display: -webkit-box;
+    
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Efeito de hover para ícones de categoria */
+.category-card:hover .group-hover\:scale-110 {
+    transform: scale(1.1);
+}
+
+/* Animação de entrada para os cards de produto ao rolar a página */
+.product-card {
+    view-timeline-name: --product-card;
+    view-timeline-axis: block;
+    animation-timeline: --product-card;
+    animation-range: entry 25% cover 50%;
+    animation-name: fadeInUp; /* Reutilizando a animação */
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #FF6B8B;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #e55a7a;
+}
+
+/* Focus states */
+button:focus, input:focus, select:focus {
+    outline: 2px solid #FF6B8B;
+    outline-offset: 2px;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}

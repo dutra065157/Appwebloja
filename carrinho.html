@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carrinho de Compras - Graça Presentes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+<body class="text-gray-800">
+    <!-- Header -->
+    <header class="gradient-bg shadow-sm sticky top-0 z-50 backdrop-blur-sm bg-white/95">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <!-- Logo -->
+            <div class="flex items-center">
+                <div class="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center mr-3 transition-transform hover:scale-105">
+                    <i data-feather="gift" class="text-pink-600 w-6 h-6"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-pink-600 font-serif">Graça Presentes</h1>
+            </div>
+            
+            <nav class="hidden md:block">
+                <ul class="flex space-x-8">
+                    <li><a href="index.html" class="font-medium hover:text-pink-600 transition">Home</a></li>
+                    <li><a href="produtos.html" class="font-medium hover:text-pink-600 transition">Produtos</a></li>
+                    
+                </ul>
+            </nav>
+            
+            <div class="flex items-center space-x-4">
+                <button class="p-2 rounded-full hover:bg-pink-100 transition" onclick="window.location.href='admin.html'">
+                    <i data-feather="user"></i>
+                </button>
+                <button class="p-2 rounded-full hover:bg-pink-100 transition relative" onclick="window.location.href='carrinho.html'">
+                    <i data-feather="shopping-cart"></i>
+                    <span id="cart-count" class="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+                </button>
+                <button class="md:hidden p-2 rounded-full hover:bg-pink-100 transition">
+                    <i data-feather="menu"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Cart Content -->
+    <main class="py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center mb-8">
+                <a href="produtos.html" class="text-pink-500 hover:text-pink-600 flex items-center">
+                    <i data-feather="chevron-left" class="mr-1"></i> Continuar comprando
+                </a>
+                <h1 class="text-3xl font-bold ml-8">Seu Carrinho</h1>
+            </div>
+            
+            <div id="empty-cart" class="bg-white rounded-xl shadow-sm p-12 text-center hidden">
+                <i data-feather="shopping-cart" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
+                <h3 class="text-xl font-bold text-gray-600 mb-2">Seu carrinho está vazio</h3>
+                <p class="text-gray-500 mb-6">Adicione alguns produtos incríveis ao seu carrinho!</p>
+                <button onclick="window.location.href='produtos.html'" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-lg font-medium transition">
+                    Explorar Produtos
+                </button>
+            </div>
+            
+            <div id="cart-content" class="flex flex-col lg:flex-row gap-8">
+                <!-- Cart Items -->
+                <div class="lg:w-2/3">
+                    <div id="cart-items" class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <!-- Itens do carrinho serão carregados via JavaScript -->
+                    </div>
+                    
+                    <div class="mt-6 bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="font-bold text-lg mb-4">Cupom de Desconto</h3>
+                        <div class="flex">
+                            <input type="text" id="cupom-input" placeholder="Digite seu cupom" class="flex-grow px-4 py-3 rounded-l-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-transparent">
+                            <button onclick="aplicarCupom()" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-r-lg font-medium transition">Aplicar</button>
+                        </div>
+                        <div id="cupom-message" class="mt-2 text-sm"></div>
+                    </div>
+                </div>
+                
+                <!-- Order Summary -->
+                <div class="lg:w-1/3">
+                    <div class="bg-white rounded-xl shadow-sm p-6 sticky top-8">
+                        <h3 class="font-bold text-lg mb-6">Resumo do Pedido</h3>
+                        
+                        <div id="order-summary" class="space-y-4 mb-6">
+                            <!-- Resumo será atualizado via JavaScript -->
+                        </div>
+                        
+                        <button onclick="finalizarCompra()" class="w-full bg-pink-500 hover:bg-pink-600 text-white py-4 rounded-lg font-bold transition shadow-md flex items-center justify-center">
+                            Finalizar Compra
+                            <i data-feather="arrow-right" class="ml-2"></i>
+                        </button>
+                        
+                        <div class="mt-6 pt-6 border-t border-gray-200">
+                            <h4 class="font-bold mb-3">Métodos de Pagamento</h4>
+                            <div class="flex space-x-3">
+                                <div class="w-10 h-6 bg-gray-100 rounded flex items-center justify-center">
+                                    <i data-feather="credit-card" class="w-4 h-4 text-gray-500"></i>
+                                </div>
+                                <div class="w-10 h-6 bg-gray-100 rounded flex items-center justify-center">
+                                    <i data-feather="dollar-sign" class="w-4 h-4 text-gray-500"></i>
+                                </div>
+                                <div class="w-10 h-6 bg-gray-100 rounded flex items-center justify-center">
+                                    <i data-feather="pie-chart" class="w-4 h-4 text-gray-500"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-12">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center mr-3">
+                            <i data-feather="gift" class="text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-bold">Graça Presentes</h3>
+                    </div>
+                    <p class="text-gray-300">Presentes especiais para momentos inesquecíveis desde 2010.</p>
+                    <div class="flex space-x-4 mt-4">
+                        <a href="#" class="text-gray-300 hover:text-white transition"><i data-feather="facebook"></i></a>
+                        <a href="#" class="text-gray-300 hover:text-white transition"><i data-feather="instagram"></i></a>
+                        <a href="#" class="text-gray-300 hover:text-white transition"><i data-feather="twitter"></i></a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-4">Links Úteis</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Sobre Nós</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Blog</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Termos de Serviço</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Política de Privacidade</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Trocas e Devoluções</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-4">Minha Conta</h4>
+                    <ul class="space-y-2">
+                        <li><a href="cadastro.html" class="text-gray-300 hover:text-white transition">Minha Conta</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Meus Pedidos</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Lista de Desejos</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-white transition">Newsletter</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-lg mb-4">Contato</h4>
+                    <ul class="space-y-2">
+                        <li class="flex items-center">
+                            <i data-feather="map-pin" class="mr-2 w-4 h-4"></i>
+                            <span class="text-gray-300">Rua das Flores, 123 - São Paulo/SP</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i data-feather="phone" class="mr-2 w-4 h-4"></i>
+                            <span class="text-gray-300">(11) 9876-5432</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i data-feather="mail" class="mr-2 w-4 h-4"></i>
+                            <span class="text-gray-300">contato@gracapresentes.com.br</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-700 mt-12 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 Graça Presentes. Todos os direitos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal de Confirmação -->
+    <div id="modal-confirmacao" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-xl shadow-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-feather="check" class="w-8 h-8 text-green-600"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-gray-800 text-center mb-2">Pedido Confirmado!</h3>
+                <p class="text-gray-600 text-center mb-6">Seu pedido foi enviado para o vendedor. Redirecionando para acompanhamento...</p>
+                <div class="flex flex-col gap-3">
+                    <button onclick="acompanharPedido()" class="bg-gradient-to-r from-pink-500 to-purple-500 text-white py-3 px-6 rounded-lg font-semibold hover:opacity-90 transition">
+                        Acompanhar Pedido Agora
+                    </button>
+                    <button onclick="voltarInicio()" class="border border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition">
+                        Voltar ao Início
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Classe Carrinho atualizada com WhatsApp
+        class Carrinho {
+            constructor() {
+                this.itens = JSON.parse(localStorage.getItem('carrinho')) || [];
+                this.desconto = 0;
+                this.atualizarContador();
+            }
+
+            adicionarItem(produto) {
+                const itemExistente = this.itens.find(item => item.id === produto.id);
+                
+                if (itemExistente) {
+                    itemExistente.quantidade += 1;
+                } else {
+                    this.itens.push({
+                        ...produto,
+                        quantidade: 1
+                    });
+                }
+                
+                this.salvar();
+                this.atualizarContador();
+                this.mostrarFeedback();
+            }
+
+            removerItem(id) {
+                this.itens = this.itens.filter(item => item.id !== id);
+                this.salvar();
+                this.atualizarContador();
+            }
+
+            atualizarQuantidade(id, quantidade) {
+                const item = this.itens.find(item => item.id === id);
+                if (item) {
+                    item.quantidade = quantidade;
+                    if (item.quantidade <= 0) {
+                        this.removerItem(id);
+                    } else {
+                        this.salvar();
+                    }
+                }
+                this.atualizarContador();
+            }
+
+            atualizarContador() {
+                const contadores = document.querySelectorAll('#cart-count');
+                const totalItens = this.itens.reduce((total, item) => total + item.quantidade, 0);
+                
+                contadores.forEach(contador => {
+                    contador.textContent = totalItens;
+                });
+            }
+
+            mostrarFeedback() {
+                const feedback = document.createElement('div');
+                feedback.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce';
+                feedback.innerHTML = `
+                    <div class="flex items-center">
+                        <i data-feather="check-circle" class="w-5 h-5 mr-2"></i>
+                        <span>Produto adicionado ao carrinho!</span>
+                    </div>
+                `;
+                
+                document.body.appendChild(feedback);
+                feather.replace();
+                
+                setTimeout(() => {
+                    feedback.remove();
+                }, 3000);
+            }
+
+            getTotal() {
+                return this.itens.reduce((total, item) => total + (item.preco * item.quantidade), 0);
+            }
+
+            getTotalComDesconto() {
+                const subtotal = this.getTotal();
+                return subtotal + 15 - (this.desconto || 0);
+            }
+
+            salvar() {
+                localStorage.setItem('carrinho', JSON.stringify(this.itens));
+            }
+
+            limpar() {
+                this.itens = [];
+                this.desconto = 0;
+                this.salvar();
+                this.atualizarContador();
+            }
+
+            // MÉTODO ATUALIZADO: Enviar pedido para o backend Python com WhatsApp
+            async enviarPedido(dadosCliente) {
+                try {
+                    const pedidoData = {
+                        cliente: {
+                            nome: dadosCliente.nome,
+                            email: dadosCliente.email,
+                            telefone: dadosCliente.telefone,
+                            endereco: dadosCliente.endereco,
+                            observacoes: dadosCliente.observacoes
+                        },
+                        itens: this.itens,
+                        total: this.getTotalComDesconto()
+                    };
+
+                    console.log('Enviando pedido:', pedidoData);
+
+                    const response = await fetch('/api/pedidos', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(pedidoData)
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        return { 
+                            success: true, 
+                            pedido_id: result.pedido_id,
+                            whatsapp_link_vendedor: result.whatsapp_link_vendedor,
+                            whatsapp_link_cliente: result.whatsapp_link_cliente,
+                            message: result.message
+                        };
+                    } else {
+                        throw new Error(result.error);
+                    }
+                } catch (error) {
+                    console.error('Erro ao enviar pedido:', error);
+                    return { 
+                        success: false, 
+                        error: 'Erro ao conectar com o servidor. Verifique se o servidor Python está rodando.' 
+                    };
+                }
+            }
+        }
+
+        // Inicializar carrinho
+        const carrinho = new Carrinho();
+
+        // Função global para atualizar contador
+        function atualizarContadorCarrinho() {
+            carrinho.atualizarContador();
+        }
+
+        // Funções do carrinho
+        function atualizarCarrinho() {
+            const itens = carrinho.itens;
+            const container = document.getElementById('cart-items');
+            const emptyCart = document.getElementById('empty-cart');
+            const cartContent = document.getElementById('cart-content');
+            
+            if (itens.length === 0) {
+                emptyCart.classList.remove('hidden');
+                cartContent.classList.add('hidden');
+                return;
+            }
+            
+            emptyCart.classList.add('hidden');
+            cartContent.classList.remove('hidden');
+            
+            // Atualizar itens do carrinho
+            container.innerHTML = itens.map((item, index) => `
+                <div class="cart-item border-b border-gray-100 p-4 flex flex-col sm:flex-row transition">
+                    <div class="w-full sm:w-32 h-32 flex-shrink-0 mb-4 sm:mb-0">
+                        <div class="w-full h-full bg-gradient-to-br ${item.corGradiente} rounded-lg flex items-center justify-center">
+                            <i data-feather="${item.icone}" class="w-8 h-8 text-white"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow sm:ml-4">
+                        <div class="flex justify-between">
+                            <div>
+                                <h3 class="font-semibold text-lg">${item.nome}</h3>
+                                <p class="text-gray-500 text-sm">${item.descricao}</p>
+                            </div>
+                            <button class="text-gray-400 hover:text-gray-600" onclick="removerItem(${index})">
+                                <i data-feather="trash-2"></i>
+                            </button>
+                        </div>
+                        <div class="mt-4 flex flex-col sm:flex-row sm:items-center justify-between">
+                            <div class="flex items-center mb-4 sm:mb-0">
+                                <button class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-pink-50" onclick="alterarQuantidade(${index}, -1)">
+                                    <i data-feather="minus" class="w-4 h-4"></i>
+                                </button>
+                                <span class="mx-4 font-medium">${item.quantidade}</span>
+                                <button class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-pink-50" onclick="alterarQuantidade(${index}, 1)">
+                                    <i data-feather="plus" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <span class="font-bold text-lg text-pink-500">R$ ${(item.preco * item.quantidade).toFixed(2).replace('.', ',')}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Atualizar resumo do pedido
+            const subtotal = carrinho.getTotal();
+            const frete = 15.00;
+            const desconto = carrinho.desconto || 0;
+            const total = subtotal + frete - desconto;
+            
+            document.getElementById('order-summary').innerHTML = `
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Subtotal (${itens.reduce((acc, item) => acc + item.quantidade, 0)} itens)</span>
+                    <span class="font-medium">R$ ${subtotal.toFixed(2).replace('.', ',')}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Frete</span>
+                    <span class="font-medium">R$ ${frete.toFixed(2).replace('.', ',')}</span>
+                </div>
+                ${desconto > 0 ? `
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Desconto</span>
+                    <span class="font-medium text-green-500">-R$ ${desconto.toFixed(2).replace('.', ',')}</span>
+                </div>
+                ` : ''}
+                <div class="border-t border-gray-200 pt-4 flex justify-between">
+                    <span class="font-bold">Total</span>
+                    <span class="font-bold text-xl text-pink-500">R$ ${total.toFixed(2).replace('.', ',')}</span>
+                </div>
+            `;
+            
+            feather.replace();
+            atualizarContadorCarrinho();
+        }
+
+        function removerItem(index) {
+            carrinho.removerItem(carrinho.itens[index].id);
+            atualizarCarrinho();
+        }
+
+        function alterarQuantidade(index, delta) {
+            const item = carrinho.itens[index];
+            carrinho.atualizarQuantidade(item.id, item.quantidade + delta);
+            atualizarCarrinho();
+        }
+
+        function aplicarCupom() {
+            const cupomInput = document.getElementById('cupom-input');
+            const cupom = cupomInput.value.toUpperCase();
+            const message = document.getElementById('cupom-message');
+            
+            if (cupom === 'GRACA10') {
+                carrinho.desconto = carrinho.getTotal() * 0.1;
+                message.innerHTML = '<span class="text-green-500">Cupom aplicado com sucesso! 10% de desconto.</span>';
+                atualizarCarrinho();
+            } else if (cupom === 'PRESENTE15') {
+                carrinho.desconto = carrinho.getTotal() * 0.15;
+                message.innerHTML = '<span class="text-green-500">Cupom aplicado com sucesso! 15% de desconto.</span>';
+                atualizarCarrinho();
+            } else {
+                message.innerHTML = '<span class="text-red-500">Cupom inválido. Tente GRACA10 ou PRESENTE15.</span>';
+            }
+        }
+
+        // FUNÇÕES PARA O MODAL
+        function acompanharPedido() {
+            window.location.href = 'admin-pedidos.html';
+        }
+
+        function voltarInicio() {
+            window.location.href = 'index.html';
+        }
+
+        // FUNÇÃO FINALIZAR COMPRA ATUALIZADA COM WHATSAPP E REDIRECIONAMENTO AUTOMÁTICO
+        async function finalizarCompra() {
+            if (carrinho.itens.length === 0) {
+                alert('Seu carrinho está vazio!');
+                return;
+            }
+
+            const dadosCliente = {
+                nome: '',
+                email: '',
+                telefone: '',
+                endereco: '',
+                observacoes: ''
+            };
+
+            dadosCliente.nome = prompt('👤 Nome completo:');
+            if (!dadosCliente.nome) {
+                alert('Nome é obrigatório!');
+                return;
+            }
+
+            dadosCliente.email = prompt('📧 E-mail:');
+            if (!dadosCliente.email) {
+                alert('E-mail é obrigatório!');
+                return;
+            }
+
+            dadosCliente.telefone = prompt('📞 Telefone com DDD (apenas números, ex: 11999999999):');
+            if (!dadosCliente.telefone) {
+                alert('Telefone é obrigatório!');
+                return;
+            }
+
+            // Validar telefone
+            const telefoneLimpo = dadosCliente.telefone.replace(/\D/g, '');
+            if (telefoneLimpo.length < 10 || telefoneLimpo.length > 11) {
+                alert('Por favor, insira um telefone válido com DDD (10 ou 11 dígitos).');
+                return;
+            }
+
+            dadosCliente.endereco = prompt('🏠 Endereço completo para entrega:');
+            if (!dadosCliente.endereco) {
+                alert('Endereço é obrigatório!');
+                return;
+            }
+
+            dadosCliente.observacoes = prompt('📝 Observações adicionais (opcional):') || '';
+
+            const confirmacao = confirm(`📋 RESUMO DO PEDIDO:\n\n👤 Cliente: ${dadosCliente.nome}\n📧 E-mail: ${dadosCliente.email}\n📞 Telefone: ${dadosCliente.telefone}\n🏠 Endereço: ${dadosCliente.endereco}\n${dadosCliente.observacoes ? `📝 Observações: ${dadosCliente.observacoes}\n` : ''}\n🛒 Itens: ${carrinho.itens.length} produto(s)\n💰 Total: R$ ${(carrinho.getTotal() + 15 - (carrinho.desconto || 0)).toFixed(2)}\n\nConfirmar envio do pedido?`);
+
+            if (!confirmacao) {
+                alert('Pedido cancelado. Você pode continuar comprando!');
+                return;
+            }
+
+            const botaoFinalizar = document.querySelector('button[onclick="finalizarCompra()"]');
+            const textoOriginal = botaoFinalizar.innerHTML;
+            botaoFinalizar.innerHTML = '<i data-feather="loader" class="animate-spin mr-2"></i> Processando...';
+            botaoFinalizar.disabled = true;
+            feather.replace();
+
+            try {
+                const resultado = await carrinho.enviarPedido(dadosCliente);
+                
+                if (resultado.success) {
+                    // Pedido criado com sucesso - Mostrar modal de confirmação
+                    const modal = document.getElementById('modal-confirmacao');
+                    modal.classList.remove('hidden');
+
+                    // Abrir WhatsApp automaticamente para o vendedor
+                    if (resultado.whatsapp_link_vendedor) {
+                        setTimeout(() => {
+                            window.open(resultado.whatsapp_link_vendedor, '_blank');
+                        }, 1000);
+                    }
+
+                    // Limpar carrinho
+                    carrinho.limpar();
+
+                    // REDIRECIONAMENTO AUTOMÁTICO APÓS 5 SEGUNDOS
+                    setTimeout(() => {
+                        window.location.href = 'admin-pedidos.html';
+                    }, 5000);
+                    
+                } else {
+                    throw new Error(resultado.error);
+                }
+            } catch (error) {
+                alert(`❌ ERRO NO PEDIDO\n\n${error.message}\n\n🔧 Verifique se o servidor está rodando:\n1. Abra o terminal/cmd\n2. Navegue até a pasta do projeto\n3. Execute: python server.py\n4. Tente novamente`);
+            } finally {
+                botaoFinalizar.innerHTML = textoOriginal;
+                botaoFinalizar.disabled = false;
+                feather.replace();
+            }
+        }
+
+        // Inicializar quando a página carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            atualizarCarrinho();
+            feather.replace();
+        });
+    </script>
+</body>
+</html>
