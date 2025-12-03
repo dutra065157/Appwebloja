@@ -110,11 +110,6 @@
         <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-pink-500"></div>
     </div>
 
-    <script src="js/app.js"></script>
-    <script>
-        // Enhanced JavaScript with better error handling and performance
-        
-
     <!-- Hero Banner -->
     <section class="relative gradient-bg py-16 md:py-24 overflow-hidden">
         <div class="absolute inset-0 bg-gradient-to-r from-pink-50/50 to-blue-50/50"></div>
@@ -478,6 +473,10 @@
         </div>
     </footer>
 
+    <script>
+        // Enhanced JavaScript with better error handling and performance
+        
+
         class App {
             constructor() {
                 this.init();
@@ -543,33 +542,6 @@
 
                 // Performance: Lazy load images
                 this.setupLazyLoading();
-            }
-
-            setupLoadingStates() {
-                // Add loading state to buttons
-                document.addEventListener('click', (e) => {
-                    if (e.target.closest('button[onclick*="window.location"]')) {
-                        const button = e.target.closest('button');
-                        this.showButtonLoading(button);
-                    }
-                });
-            }
-
-            setupLazyLoading() {
-                // Simple lazy loading implementation
-                const images = document.querySelectorAll('img[data-src]');
-                const imageObserver = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            const img = entry.target;
-                            img.src = img.getAttribute('data-src');
-                            img.removeAttribute('data-src');
-                            imageObserver.unobserve(img);
-                        }
-                    });
-                });
-
-                images.forEach(img => imageObserver.observe(img));
             }
 
             async loadFeaturedProducts() {
@@ -926,6 +898,32 @@
                 cards.forEach((card, index) => {
                     card.style.animationDelay = `${index * 100}ms`;
                     card.classList.add('animate-fade-in-up');
+                });
+            }
+        }
+
+        // Initialize mobile menu
+        function initializeMobileMenu() {
+            const menuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+
+            if (menuButton && mobileMenu) {
+                menuButton.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    mobileMenu.classList.toggle('hidden');
+                    const isHidden = mobileMenu.classList.contains('hidden');
+                    menuButton.querySelector('i').setAttribute('data-feather', isHidden ? 'menu' : 'x');
+                    if (typeof feather !== 'undefined') feather.replace();
+                });
+
+                document.addEventListener('click', (event) => {
+                    if (!mobileMenu.contains(event.target) && !menuButton.contains(event.target)) {
+                        if (!mobileMenu.classList.contains('hidden')) {
+                            mobileMenu.classList.add('hidden');
+                            menuButton.querySelector('i').setAttribute('data-feather', 'menu');
+                            if (typeof feather !== 'undefined') feather.replace();
+                        }
+                    }
                 });
             }
         }
