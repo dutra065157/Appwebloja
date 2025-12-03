@@ -1,23 +1,28 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+require('dotenv').config(); // Garante que as variáveis de ambiente sejam carregadas
 const { connectToDb } = require('./database');
 const { ObjectId } = require('mongodb'); // Importante para buscar por ID
 
 // Tentar importar e configurar Cloudinary
 let cloudinary;
 let CLOUDINARY_AVAILABLE = false;
-try {
+if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+  try {
     cloudinary = require('cloudinary').v2;
     cloudinary.config({
-        cloud_name: 'dxgd62afy',
-        api_key: '965736457473817',
-        api_secret: 'm0JaTO4RGehmeZexoqjW6cGkLfs',
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
         secure: true
     });
     CLOUDINARY_AVAILABLE = true;
 } catch (e) {
     console.warn("⚠️ Cloudinary não instalado. Para instalar, rode: npm install cloudinary");
+}
+} else {
+    console.warn("⚠️ Credenciais do Cloudinary não encontradas nas variáveis de ambiente. Upload de imagens desativado.");
 }
 
 // Configuração

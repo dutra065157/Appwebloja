@@ -102,6 +102,17 @@
                 </li>
             </ul>
         </div>
+
+    </header>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-pink-500"></div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Enhanced JavaScript with better error handling and performance
         
 
     <!-- Hero Banner -->
@@ -467,14 +478,6 @@
         </div>
     </footer>
 
-    <!-- Loading Spinner -->
-    <div id="loading-spinner" class="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
-        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-pink-500"></div>
-    </div>
-
-    <script src="js/app.js"></script>
-    <script>
-        // Enhanced JavaScript with better error handling and performance
         class App {
             constructor() {
                 this.init();
@@ -540,30 +543,6 @@
 
                 // Performance: Lazy load images
                 this.setupLazyLoading();
-            }
-
-            initializeMobileMenu() {
-                const menuButton = document.getElementById('mobile-menu-button');
-                const mobileMenu = document.getElementById('mobile-menu');
-                
-                if (menuButton && mobileMenu) {
-                    menuButton.addEventListener('click', () => {
-                        mobileMenu.classList.toggle('hidden');
-                        menuButton.querySelector('i').setAttribute('data-feather', 
-                            mobileMenu.classList.contains('hidden') ? 'menu' : 'x'
-                        );
-                        feather.replace();
-                    });
-
-                    // Close menu when clicking outside
-                    document.addEventListener('click', (e) => {
-                        if (!menuButton.contains(e.target) && !mobileMenu.contains(e.target)) {
-                            mobileMenu.classList.add('hidden');
-                            menuButton.querySelector('i').setAttribute('data-feather', 'menu');
-                            feather.replace();
-                        }
-                    });
-                }
             }
 
             setupLoadingStates() {
