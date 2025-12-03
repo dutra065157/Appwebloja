@@ -9,10 +9,8 @@
     
     <!-- Preload critical resources -->
     <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
-    <link rel="preload" href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js" as="script">
-    
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <!-- feather.min.js will be loaded dynamically by the App class -->
     <link rel="stylesheet" href="styles/style.css">
     
     <!-- Structured Data -->
@@ -180,7 +178,7 @@
                 <div class="category-card group bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl p-6 text-center hover:shadow-2xl transition-all duration-500 cursor-pointer transform hover:-translate-y-2 border border-pink-100"
                      onclick="window.location.href='produtos.html?categoria=flores'">
                     <div class="w-20 h-20 bg-gradient-to-br from-pink-200 to-rose-300 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-                        <i data-feather="flower" class="w-8 h-8 text-pink-600"></i>
+                        <i data-feather="wind" class="w-8 h-8 text-pink-600"></i>
                     </div>
                     <h3 class="font-bold text-xl text-gray-800 mb-2">Flores</h3>
                     <p class="text-gray-500 text-sm">Buquês frescos e arranjos especiais</p>
@@ -479,6 +477,7 @@
 
         class App {
             constructor() {
+                this.produtos = []; // Store products to avoid re-fetching
                 this.init();
             }
 
@@ -523,6 +522,17 @@
                 this.setupLoadingStates();
             }
 
+            setupLoadingStates() {
+                // Adiciona estado de carregamento para botões que navegam para outra página
+                document.addEventListener('click', (e) => {
+                    // Verifica se o clique foi em um botão com window.location
+                    if (e.target.closest('button[onclick*="window.location"]')) {
+                        const button = e.target.closest('button');
+                        this.showButtonLoading(button);
+                    }
+                });
+            }
+
             setupEventListeners() {
                 // Newsletter form
                 const newsletterForm = document.querySelector('form[onsubmit="assinarNewsletter(event)"]');
@@ -544,6 +554,51 @@
                 this.setupLazyLoading();
             }
 
+            setupLazyLoading() {
+                const lazyImages = document.querySelectorAll('img[loading="lazy"]');
+                if ("IntersectionObserver" in window) {
+                    const lazyImageObserver = new IntersectionObserver((entries, observer) => {
+                        entries.forEach((entry) => {
+                            if (entry.isIntersecting) {
+                                const lazyImage = entry.target;
+                                lazyImage.src = lazyImage.dataset.src;
+                                lazyImage.removeAttribute("loading");
+                                lazyImageObserver.unobserve(lazyImage);
+                            }
+                        });
+                    });
+
+                    lazyImages.forEach((lazyImage) => {
+                        lazyImageObserver.observe(lazyImage);
+                    });
+                }
+            }
+
+            initializeMobileMenu() {
+                const menuButton = document.getElementById('mobile-menu-button');
+                const mobileMenu = document.getElementById('mobile-menu');
+
+                if (menuButton && mobileMenu) {
+                    menuButton.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                        mobileMenu.classList.toggle('hidden');
+                        const isHidden = mobileMenu.classList.contains('hidden');
+                        menuButton.querySelector('i').setAttribute('data-feather', isHidden ? 'menu' : 'x');
+                        if (typeof feather !== 'undefined') feather.replace();
+                    });
+
+                    document.addEventListener('click', (event) => {
+                        if (!mobileMenu.contains(event.target) && !menuButton.contains(event.target)) {
+                            if (!mobileMenu.classList.contains('hidden')) {
+                                mobileMenu.classList.add('hidden');
+                                menuButton.querySelector('i').setAttribute('data-feather', 'menu');
+                                if (typeof feather !== 'undefined') feather.replace();
+                            }
+                        }
+                    });
+                }
+            }
+
             async loadFeaturedProducts() {
                 try {
                     this.showLoading();
@@ -560,8 +615,8 @@
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
 
-                    const produtos = await response.json();
-                    this.renderFeaturedProducts(produtos);
+                    this.produtos = await response.json(); // Store products in the class instance
+                    this.renderFeaturedProducts(this.produtos);
                     
                 } catch (error) {
                     console.error('Erro ao carregar produtos:', error);
@@ -675,16 +730,14 @@
             }
 
             async addToCart(productId, button) {
+                const originalHTML = button.innerHTML;
                 try {
                     // Show loading state on button
-                    const originalHTML = button.innerHTML;
                     button.innerHTML = '<i data-feather="loader" class="w-4 h-4 animate-spin"></i>';
                     if (typeof feather !== 'undefined') feather.replace();
 
-                    // Get product details (in a real app, you might already have this data)
-                    const response = await fetch('/api/produtos');
-                    const produtos = await response.json();
-                    const produto = produtos.find(p => p.id === productId);
+                    // Find product from the stored list
+                    const produto = this.produtos.find(p => p.id === productId);
                     
                     if (!produto) {
                         throw new Error('Produto não encontrado');
@@ -719,7 +772,7 @@
                 } catch (error) {
                     console.error('Erro ao adicionar ao carrinho:', error);
                     this.showError('Erro ao adicionar produto ao carrinho');
-                    button.innerHTML = originalHTML;
+                    button.innerHTML = originalHTML; // Now originalHTML is accessible here
                     if (typeof feather !== 'undefined') feather.replace();
                 }
             }
@@ -898,32 +951,6 @@
                 cards.forEach((card, index) => {
                     card.style.animationDelay = `${index * 100}ms`;
                     card.classList.add('animate-fade-in-up');
-                });
-            }
-        }
-
-        // Initialize mobile menu
-        function initializeMobileMenu() {
-            const menuButton = document.getElementById('mobile-menu-button');
-            const mobileMenu = document.getElementById('mobile-menu');
-
-            if (menuButton && mobileMenu) {
-                menuButton.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    mobileMenu.classList.toggle('hidden');
-                    const isHidden = mobileMenu.classList.contains('hidden');
-                    menuButton.querySelector('i').setAttribute('data-feather', isHidden ? 'menu' : 'x');
-                    if (typeof feather !== 'undefined') feather.replace();
-                });
-
-                document.addEventListener('click', (event) => {
-                    if (!mobileMenu.contains(event.target) && !menuButton.contains(event.target)) {
-                        if (!mobileMenu.classList.contains('hidden')) {
-                            mobileMenu.classList.add('hidden');
-                            menuButton.querySelector('i').setAttribute('data-feather', 'menu');
-                            if (typeof feather !== 'undefined') feather.replace();
-                        }
-                    }
                 });
             }
         }
