@@ -5,7 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel do Vendedor - Graça Presentes</title>
     <script src="https://cdn.tailwindcss.com"></script>
-<!-- Header -->
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #fdf2f8 0%, #f0f9ff 100%);
+        }
+        
+        .image-preview-container {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .remove-image-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #ef4444;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .remove-image-btn:hover {
+            background: #dc2626;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
     <header class="gradient-bg shadow-sm sticky top-0 z-50 backdrop-blur-sm bg-white/95">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <!-- Logo -->
@@ -18,18 +54,13 @@
             
             <nav class="hidden md:block">
                 <ul class="flex space-x-8">
-                    
-                    <li><a href="index.html" class="nav-link font-medium hover:text-pink-600 transition">sair</a></li>
+                    <li><a href="index.html" class="nav-link font-medium hover:text-pink-600 transition">Sair</a></li>
+                    <li><a href="produtos.html" class="nav-link font-medium hover:text-pink-600 transition">Ver Produtos</a></li>
                 </ul>
             </nav>
-            
-            
+        </div>
     </header>
 
-
-
-</head>
-<body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-8">
         <!-- Cabeçalho -->
         <div class="text-center mb-8">
@@ -63,6 +94,7 @@
                             <option value="Kits">🎁 Kits</option>
                             <option value="Decoração">🏠 Decoração</option>
                             <option value="Joias">💎 Joias</option>
+                            <option value="Românticos">❤️ Românticos</option>
                         </select>
                     </div>
                 </div>
@@ -78,7 +110,7 @@
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">🏷️ Preço Original (opcional)</label>
-                        <input type="number" step="0.01" name="preco_original" 
+                        <input type="number" step="0.01" name="precoOriginal" 
                                class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                                placeholder="99.90">
                     </div>
@@ -100,28 +132,34 @@
 
                 <!-- Upload de Imagem -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">🖼️ Imagem do Produto</label>
-                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                        <input type="file" id="imagemInput" accept="image/*" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">🖼️ Imagem do Produto (opcional)</label>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-colors hover:border-pink-400">
+                        <input type="file" id="imagemInput" accept="image/*" class="hidden" 
+                               onchange="previewImagem(event)">
                         
                         <div id="uploadArea" class="cursor-pointer">
                             <div class="mx-auto w-12 h-12 text-gray-400 mb-3">
                                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                    </path>
                                 </svg>
                             </div>
                             <p class="text-gray-600">Clique para selecionar uma imagem</p>
-                            <p class="text-sm text-gray-500 mt-1">PNG, JPG, JPEG até 10MB</p>
+                            <p class="text-sm text-gray-500 mt-1">PNG, JPG, JPEG até 5MB</p>
                         </div>
                         
-                        <div id="previewImagem" class="hidden mt-4">
-                            <img id="imagemPreview" class="mx-auto max-h-48 rounded-lg shadow-md">
-                            <button type="button" onclick="removerImagem()" 
-                                    class="mt-2 text-red-600 hover:text-red-800 text-sm font-medium">
-                                🗑️ Remover imagem
-                            </button>
+                        <!-- Preview da Imagem -->
+                        <div id="previewContainer" class="hidden mt-4">
+                            <div class="image-preview-container">
+                                <img id="imagemPreview" class="mx-auto max-h-48 rounded-lg shadow-md object-cover">
+                                <div class="remove-image-btn" onclick="removerImagem()" title="Remover imagem">
+                                    ×
+                                </div>
+                            </div>
                         </div>
                     </div>
+                    <p class="text-xs text-gray-500 mt-2">Dica: Use imagens quadradas (1:1) para melhor visualização</p>
                 </div>
 
                 <!-- Opções -->
@@ -132,14 +170,14 @@
                     </div>
                     
                     <div class="flex items-center">
-                        <input type="checkbox" name="mais_vendido" id="mais_vendido" class="w-4 h-4 text-pink-600 focus:ring-pink-500">
-                        <label for="mais_vendido" class="ml-2 text-sm text-gray-700">🔥 Mais Vendido</label>
+                        <input type="checkbox" name="maisVendido" id="maisVendido" class="w-4 h-4 text-pink-600 focus:ring-pink-500">
+                        <label for="maisVendido" class="ml-2 text-sm text-gray-700">🔥 Mais Vendido</label>
                     </div>
                 </div>
 
                 <!-- Botão Submit -->
                 <button type="submit" 
-                        class="w-full bg-pink-600 text-white py-3 px-6 rounded-lg hover:bg-pink-700 transition duration-200 font-semibold text-lg">
+                        class="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-rose-600 transition duration-200 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
                     🚀 Cadastrar Produto
                 </button>
             </form>
@@ -149,7 +187,13 @@
         <div class="bg-white rounded-lg shadow-md p-6">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-semibold text-gray-800">📦 Produtos Cadastrados</h2>
-                <span id="totalProdutos" class="bg-pink-100 text-pink-800 px-3 py-1 rounded-full text-sm font-medium">0 produtos</span>
+                <div class="flex items-center space-x-3">
+                    <span id="totalProdutos" class="bg-pink-100 text-pink-800 px-3 py-1 rounded-full text-sm font-medium">0 produtos</span>
+                    <button onclick="exportarProdutos()" 
+                            class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium hover:bg-green-200 transition">
+                        📤 Exportar
+                    </button>
+                </div>
             </div>
             
             <div id="listaProdutos" class="space-y-4">
@@ -163,42 +207,280 @@
     </div>
 
     <script>
+        feather.replace();
+        
+        // Variável para armazenar a imagem em Base64
         let imagemBase64 = null;
 
-        // Gerenciar upload de imagem
-        document.getElementById('uploadArea').addEventListener('click', function() {
-            document.getElementById('imagemInput').click();
-        });
+        // Sistema de Armazenamento de Produtos com Suporte a Imagens
+        class ProdutoDatabase {
+            constructor() {
+                this.chaveStorage = 'graca_presentes_produtos';
+                this.chaveImagens = 'graca_presentes_imagens';
+                this.inicializarDadosPadrao();
+            }
 
-        document.getElementById('imagemInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
+            inicializarDadosPadrao() {
+                const produtos = this.obterProdutos();
+                
+                // Se não houver produtos, inicializar com alguns exemplos
+                if (produtos.length === 0) {
+                    const produtosPadrao = [
+                        {
+                            id: 1,
+                            nome: "Buquê de Rosas Vermelhas Premium",
+                            descricao: "12 rosas vermelhas frescas importadas com embalagem especial",
+                            preco: 129.90,
+                            precoOriginal: 149.90,
+                            categoria: "Flores",
+                            desconto: 13,
+                            novo: true,
+                            maisVendido: true,
+                            cor: "pink",
+                            icone: "sun",
+                            corGradiente: "from-pink-200 to-rose-300",
+                            imagem_url: "" // Imagem vazia por padrão
+                        },
+                        {
+                            id: 2,
+                            nome: "Kit Café Gourmet",
+                            descricao: "Grãos especiais selecionados + 2 canecas cerâmicas artesanais",
+                            preco: 159.90,
+                            precoOriginal: 179.90,
+                            categoria: "Kits",
+                            desconto: 11,
+                            novo: false,
+                            maisVendido: false,
+                            cor: "amber",
+                            icone: "coffee",
+                            corGradiente: "from-amber-200 to-orange-300",
+                            imagem_url: ""
+                        },
+                        {
+                            id: 3,
+                            nome: "Caixa de Chocolates Belgas",
+                            descricao: "24 chocolates finos importados da Bélgica em embalagem premium",
+                            preco: 89.90,
+                            precoOriginal: 99.90,
+                            categoria: "Doces",
+                            desconto: 10,
+                            novo: false,
+                            maisVendido: true,
+                            cor: "yellow",
+                            icone: "box",
+                            corGradiente: "from-yellow-200 to-amber-300",
+                            imagem_url: ""
+                        }
+                    ];
+                    
+                    this.salvarProdutos(produtosPadrao);
+                }
+            }
+
+            obterProdutos() {
+                try {
+                    const produtos = localStorage.getItem(this.chaveStorage);
+                    return produtos ? JSON.parse(produtos) : [];
+                } catch (error) {
+                    console.error('Erro ao obter produtos:', error);
+                    return [];
+                }
+            }
+
+            salvarProdutos(produtos) {
+                try {
+                    localStorage.setItem(this.chaveStorage, JSON.stringify(produtos));
+                    return true;
+                } catch (error) {
+                    console.error('Erro ao salvar produtos:', error);
+                    return false;
+                }
+            }
+
+            adicionarProduto(produto) {
+                const produtos = this.obterProdutos();
+                
+                // Gerar novo ID
+                const novoId = produtos.length > 0 
+                    ? Math.max(...produtos.map(p => p.id)) + 1 
+                    : 1;
+                
+                const novoProduto = {
+                    ...produto,
+                    id: novoId,
+                    dataCadastro: new Date().toISOString(),
+                    // Garantir que temos as propriedades necessárias
+                    cor: produto.cor || this.obterCorPorCategoria(produto.categoria),
+                    icone: produto.icone || this.obterIconePorCategoria(produto.categoria),
+                    corGradiente: produto.corGradiente || this.obterGradientePorCategoria(produto.categoria)
+                };
+                
+                produtos.push(novoProduto);
+                this.salvarProdutos(produtos);
+                return novoProduto;
+            }
+
+            // Salvar imagem separadamente para evitar problemas de tamanho
+            salvarImagem(produtoId, base64Data) {
+                try {
+                    const imagens = this.obterImagens();
+                    imagens[produtoId] = base64Data;
+                    localStorage.setItem(this.chaveImagens, JSON.stringify(imagens));
+                    
+                    // Atualizar URL da imagem no produto
+                    const produtos = this.obterProdutos();
+                    const produtoIndex = produtos.findIndex(p => p.id === produtoId);
+                    if (produtoIndex !== -1) {
+                        produtos[produtoIndex].imagem_url = base64Data;
+                        this.salvarProdutos(produtos);
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Erro ao salvar imagem:', error);
+                    return false;
+                }
+            }
+
+            obterImagens() {
+                try {
+                    const imagens = localStorage.getItem(this.chaveImagens);
+                    return imagens ? JSON.parse(imagens) : {};
+                } catch (error) {
+                    console.error('Erro ao obter imagens:', error);
+                    return {};
+                }
+            }
+
+            obterCorPorCategoria(categoria) {
+                const cores = {
+                    'Flores': 'pink',
+                    'Doces': 'yellow',
+                    'Pelúcias': 'purple',
+                    'Cosméticos': 'rose',
+                    'Kits': 'amber',
+                    'Decoração': 'blue',
+                    'Joias': 'green',
+                    'Românticos': 'rose'
+                };
+                return cores[categoria] || 'gray';
+            }
+
+            obterIconePorCategoria(categoria) {
+                const icones = {
+                    'Flores': 'sun',
+                    'Doces': 'box',
+                    'Pelúcias': 'heart',
+                    'Cosméticos': 'star',
+                    'Kits': 'package',
+                    'Decoração': 'home',
+                    'Joias': 'award',
+                    'Românticos': 'heart'
+                };
+                return icones[categoria] || 'gift';
+            }
+
+            obterGradientePorCategoria(categoria) {
+                const gradientes = {
+                    'Flores': 'from-pink-200 to-rose-300',
+                    'Doces': 'from-yellow-200 to-amber-300',
+                    'Pelúcias': 'from-purple-200 to-pink-300',
+                    'Cosméticos': 'from-rose-200 to-pink-300',
+                    'Kits': 'from-amber-200 to-orange-300',
+                    'Decoração': 'from-blue-200 to-cyan-300',
+                    'Joias': 'from-green-200 to-emerald-300',
+                    'Românticos': 'from-rose-200 to-red-300'
+                };
+                return gradientes[categoria] || 'from-gray-400 to-gray-600';
+            }
+
+            removerProduto(id) {
+                const produtos = this.obterProdutos();
+                const produtosFiltrados = produtos.filter(p => p.id !== id);
+                
+                // Remover imagem associada
+                const imagens = this.obterImagens();
+                delete imagens[id];
+                localStorage.setItem(this.chaveImagens, JSON.stringify(imagens));
+                
+                return this.salvarProdutos(produtosFiltrados);
+            }
+
+            exportarDados() {
+                const produtos = this.obterProdutos();
+                const imagens = this.obterImagens();
+                
+                const dados = {
+                    produtos: produtos,
+                    imagens: imagens,
+                    dataExportacao: new Date().toISOString(),
+                    totalProdutos: produtos.length
+                };
+                
+                const dadosString = JSON.stringify(dados, null, 2);
+                const blob = new Blob([dadosString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `produtos_graca_presentes_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                return true;
+            }
+        }
+
+        const produtoDB = new ProdutoDatabase();
+
+        // Funções para manipulação de imagem
+        function previewImagem(event) {
+            const file = event.target.files[0];
             if (file) {
-                // Verificar tamanho (max 10MB)
-                if (file.size > 10 * 1024 * 1024) {
-                    alert('❌ A imagem deve ter no máximo 10MB');
+                // Verificar tamanho (max 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('❌ A imagem deve ter no máximo 5MB');
+                    return;
+                }
+
+                // Verificar tipo
+                if (!file.type.match('image.*')) {
+                    alert('❌ Por favor, selecione apenas arquivos de imagem');
                     return;
                 }
 
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     imagemBase64 = e.target.result;
-                    document.getElementById('imagemPreview').src = imagemBase64;
-                    document.getElementById('previewImagem').classList.remove('hidden');
+                    
+                    // Mostrar preview
+                    const previewImg = document.getElementById('imagemPreview');
+                    previewImg.src = imagemBase64;
+                    
+                    // Mostrar container do preview
+                    document.getElementById('previewContainer').classList.remove('hidden');
                     document.getElementById('uploadArea').classList.add('hidden');
                 }
                 reader.readAsDataURL(file);
             }
-        });
+        }
 
         function removerImagem() {
             imagemBase64 = null;
             document.getElementById('imagemInput').value = '';
-            document.getElementById('previewImagem').classList.add('hidden');
+            document.getElementById('previewContainer').classList.add('hidden');
             document.getElementById('uploadArea').classList.remove('hidden');
         }
 
+        // Permitir clicar na área de upload
+        document.getElementById('uploadArea').addEventListener('click', function() {
+            document.getElementById('imagemInput').click();
+        });
+
         // Cadastrar produto
-        document.getElementById('produtoForm').addEventListener('submit', async function(e) {
+        document.getElementById('produtoForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
             const button = this.querySelector('button[type="submit"]');
@@ -210,63 +492,90 @@
             const produtoData = {
                 nome: formData.get('nome'),
                 preco: parseFloat(formData.get('preco')),
-                preco_original: formData.get('preco_original') ? parseFloat(formData.get('preco_original')) : null,
+                precoOriginal: formData.get('precoOriginal') ? parseFloat(formData.get('precoOriginal')) : null,
                 categoria: formData.get('categoria'),
                 descricao: formData.get('descricao'),
                 desconto: parseInt(formData.get('desconto') || 0),
                 novo: document.getElementById('novo').checked,
-                mais_vendido: document.getElementById('mais_vendido').checked
+                maisVendido: document.getElementById('maisVendido').checked,
+                imagem_url: "" // Será preenchida depois se houver imagem
             };
 
             try {
                 // 1. Cadastrar produto
-                const response = await fetch('/api/produtos', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(produtoData)
-                });
-
-                const result = await response.json();
+                const novoProduto = produtoDB.adicionarProduto(produtoData);
                 
-                if (result.success) {
-                    // 2. Se tem imagem, fazer upload
+                if (novoProduto) {
+                    // 2. Se tem imagem, salvar separadamente
                     if (imagemBase64) {
-                        await fetch('/api/upload-imagem', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                produto_id: result.produto_id,
-                                imagem_base64: imagemBase64
-                            })
-                        });
+                        produtoDB.salvarImagem(novoProduto.id, imagemBase64);
                     }
-
-                    alert('✅ Produto cadastrado com sucesso!');
+                    
+                    // Mostrar feedback
+                    mostrarFeedback('✅ Produto cadastrado com sucesso!', 'success');
+                    
+                    // Resetar formulário
                     this.reset();
                     removerImagem();
+                    document.getElementById('novo').checked = false;
+                    document.getElementById('maisVendido').checked = false;
+                    
+                    // Recarregar lista
                     carregarProdutos();
                 } else {
-                    alert('❌ Erro ao cadastrar produto: ' + result.error);
+                    mostrarFeedback('❌ Erro ao cadastrar produto', 'error');
                 }
             } catch (error) {
-                alert('❌ Erro ao cadastrar produto: ' + error);
+                console.error('Erro ao cadastrar produto:', error);
+                mostrarFeedback('❌ Erro ao cadastrar produto: ' + error.message, 'error');
             } finally {
                 button.innerHTML = originalText;
                 button.disabled = false;
             }
         });
 
+        function mostrarFeedback(mensagem, tipo) {
+            // Remover feedback anterior se existir
+            const feedbackAnterior = document.querySelector('.form-feedback');
+            if (feedbackAnterior) {
+                feedbackAnterior.remove();
+            }
+
+            const feedback = document.createElement('div');
+            feedback.className = `form-feedback fixed top-4 right-4 z-50 p-4 rounded-xl shadow-lg transform translate-x-full transition-transform duration-300 ${
+                tipo === 'success' ? 'bg-green-500' : 'bg-red-500'
+            } text-white`;
+            feedback.innerHTML = `
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3">
+                        <i data-feather="${tipo === 'success' ? 'check' : 'alert-triangle'}" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <p class="font-semibold">${mensagem}</p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(feedback);
+            feather.replace();
+            
+            // Animate in
+            setTimeout(() => feedback.classList.remove('translate-x-full'), 100);
+            
+            // Remove after delay
+            setTimeout(() => {
+                feedback.classList.add('translate-x-full');
+                setTimeout(() => feedback.remove(), 300);
+            }, 4000);
+        }
+
         // Carregar produtos
-        async function carregarProdutos() {
+        function carregarProdutos() {
             try {
-                const response = await fetch('/api/produtos');
-                const produtos = await response.json();
+                const produtos = produtoDB.obterProdutos();
+                const imagens = produtoDB.obterImagens();
                 
-                document.getElementById('totalProdutos').textContent = `${produtos.length} produtos`;
+                document.getElementById('totalProdutos').textContent = `${produtos.length} produto${produtos.length !== 1 ? 's' : ''}`;
                 
                 const lista = document.getElementById('listaProdutos');
                 
@@ -275,40 +584,85 @@
                         <div class="text-center py-8 text-gray-500">
                             <div class="text-4xl mb-2">📝</div>
                             <p>Nenhum produto cadastrado ainda</p>
+                            <p class="text-sm mt-2">Use o formulário acima para adicionar seu primeiro produto!</p>
                         </div>
                     `;
                     return;
                 }
                 
-                lista.innerHTML = produtos.map(produto => `
-                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                lista.innerHTML = produtos.map(produto => {
+                    const temImagem = imagens[produto.id] || produto.imagem_url;
+                    
+                    return `
+                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition group">
                         <div class="flex items-center space-x-4">
-                            ${produto.imagem_url ? 
-                                `<img src="${produto.imagem_url}" class="w-20 h-20 object-cover rounded-lg">` : 
-                                `<div class="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center">
-                                    <span class="text-2xl text-gray-400">📷</span>
+                            ${temImagem ? 
+                                `<div class="w-20 h-20 flex-shrink-0">
+                                    <img src="${imagens[produto.id] || produto.imagem_url}" 
+                                         class="w-full h-full object-cover rounded-lg shadow-sm"
+                                         alt="${produto.nome}">
+                                </div>` :
+                                `<div class="w-20 h-20 ${produto.corGradiente || 'bg-gray-100'} rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <i data-feather="${produto.icone || 'gift'}" class="w-8 h-8 text-white"></i>
                                 </div>`
                             }
                             <div class="flex-1">
-                                <h3 class="font-semibold text-lg text-gray-800">${produto.nome}</h3>
-                                <p class="text-gray-600">${produto.descricao || 'Sem descrição'}</p>
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3 class="font-semibold text-lg text-gray-800">${produto.nome}</h3>
+                                        <p class="text-gray-600 text-sm mt-1 line-clamp-2">${produto.descricao || 'Sem descrição'}</p>
+                                    </div>
+                                    <button onclick="removerProduto(${produto.id})" 
+                                            class="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Remover produto">
+                                        <i data-feather="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
                                 <div class="flex items-center space-x-4 mt-2">
                                     <span class="text-pink-600 font-bold">R$ ${produto.preco.toFixed(2)}</span>
                                     <span class="text-sm text-gray-500">${produto.categoria}</span>
                                     ${produto.desconto > 0 ? 
                                         `<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">${produto.desconto}% OFF</span>` : ''}
                                 </div>
-                            </div>
-                            <div class="flex space-x-2">
-                                ${produto.novo ? '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Novo</span>' : ''}
-                                ${produto.maisVendido ? '<span class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">Mais Vendido</span>' : ''}
+                                <div class="flex space-x-2 mt-2">
+                                    ${produto.novo ? '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Novo</span>' : ''}
+                                    ${produto.maisVendido ? '<span class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">Mais Vendido</span>' : ''}
+                                    <span class="text-xs text-gray-400">
+                                        ID: ${produto.id}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                `).join('');
+                    `;
+                }).join('');
+                
+                feather.replace();
             } catch (error) {
                 console.error('Erro ao carregar produtos:', error);
+                const lista = document.getElementById('listaProdutos');
                 lista.innerHTML = '<p class="text-red-500 text-center">Erro ao carregar produtos</p>';
+            }
+        }
+
+        function removerProduto(id) {
+            if (confirm('Tem certeza que deseja remover este produto?')) {
+                const sucesso = produtoDB.removerProduto(id);
+                if (sucesso) {
+                    mostrarFeedback('✅ Produto removido com sucesso!', 'success');
+                    carregarProdutos();
+                } else {
+                    mostrarFeedback('❌ Erro ao remover produto', 'error');
+                }
+            }
+        }
+
+        function exportarProdutos() {
+            const sucesso = produtoDB.exportarDados();
+            if (sucesso) {
+                mostrarFeedback('✅ Produtos exportados com sucesso!', 'success');
+            } else {
+                mostrarFeedback('❌ Erro ao exportar produtos', 'error');
             }
         }
 
