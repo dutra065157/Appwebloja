@@ -1,29 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs'); // 👈 Adicionado para manipular arquivos
 require('dotenv').config(); // Garante que as variáveis de ambiente sejam carregadas
 const { connectToDb } = require('./database');
 const { ObjectId } = require('mongodb'); // Importante para buscar por ID
-
-// Tentar importar e configurar Cloudinary
-let cloudinary;
-let CLOUDINARY_AVAILABLE = false;
-if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
-  try {
-    cloudinary = require('cloudinary').v2;
-    cloudinary.config({
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-        api_key: process.env.CLOUDINARY_API_KEY,
-        api_secret: process.env.CLOUDINARY_API_SECRET,
-        secure: true
-    });
-    CLOUDINARY_AVAILABLE = true;
-} catch (e) {
-    console.warn("⚠️ Cloudinary não instalado. Para instalar, rode: npm install cloudinary");
-}
-} else {
-    console.warn("⚠️ Credenciais do Cloudinary não encontradas nas variáveis de ambiente. Upload de imagens desativado.");
-}
 
 // Configuração
 const PORT = process.env.PORT || 8000;
@@ -39,7 +20,21 @@ const WHATSAPP_CONFIG = {
 // Middlewares
 app.use(cors()); // Habilita CORS para todas as rotas
 app.use(express.json({ limit: '10mb' })); // Permite receber JSON no corpo das requisições
+
+// 📁 Servir a pasta de uploads como estática
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir); // Cria a pasta 'uploads' se ela não existir
+}
+app.use('/uploads', express.static(uploadsDir));
 app.use(express.static(__dirname)); // Serve arquivos estáticos (html, css, js) da pasta raiz
+
+// Middleware de tratamento de erros (opcional, mas recomendado)
+const errorHandler = (err, req, res, next) => {
+    console.error(`❌ Erro Inesperado: ${err.message}`);
+    console.error(err.stack);
+    res.status(500).json({ error: 'Ocorreu um erro inesperado no servidor.' });
+};
 
 // --- ROTAS DA API ---
 
@@ -52,14 +47,14 @@ app.get('/api/health', async (req, res) => {
             status: 'OK',
             message: 'Graça Presentes Backend rodando!',
             features: {
-                whatsapp_integration: true,
-                cloudinary_integration: CLOUDINARY_AVAILABLE,
+                whatsapp_integration: true,                
                 database: 'MongoDB',
                 products_count: products_count
             }
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        // Passa o erro para o próximo middleware (o errorHandler)
+        next(error);
     }
 });
 
@@ -71,8 +66,7 @@ app.get('/api/produtos', async (req, res) => {
         const produtos = await db.collection('produtos').find().sort({ createdAt: -1 }).toArray();
         res.status(200).json(produtos.map(p => ({ ...p, id: p._id })));
     } catch (error) {
-        console.error(`❌ Erro ao buscar produtos: ${error.message}`);
-        res.status(500).json({ error: `Erro ao buscar produtos: ${error.message}` });
+        next(error);
     }
 });
 
@@ -104,8 +98,7 @@ app.post('/api/produtos', async (req, res) => {
             message: 'Produto cadastrado com sucesso'
         });
     } catch (error) {
-        console.error(`❌ Erro ao cadastrar produto: ${error.message}`);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
@@ -116,8 +109,7 @@ app.get('/api/pedidos', async (req, res) => {
         const pedidos = await db.collection('pedidos').find().sort({ dataCriacao: -1 }).toArray();
         res.status(200).json(pedidos.map(p => ({ ...p, id: p._id })));
     } catch (error) {
-        console.error(`❌ Erro ao buscar pedidos: ${error.message}`);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
@@ -156,48 +148,47 @@ app.post('/api/pedidos', async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`❌ Erro ao processar pedido: ${error.message}`);
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 });
 
 // Rota para upload de imagem
-app.post('/api/upload-imagem', async (req, res) => {
-    if (!CLOUDINARY_AVAILABLE) {
-        return res.status(500).json({ error: 'Cloudinary não disponível' });
-    }
-
+app.post('/api/upload-imagem', async (req, res, next) => {
     try {
-        const db = await connectToDb();
         const { imagem_base64, produto_id } = req.body;
 
-        const result = await cloudinary.uploader.upload(
-            imagem_base64, // O SDK do Node.js aceita o Data URI completo
-            {
-                folder: "graca-presentes",
-                public_id: `produto_${produto_id}`,
-                overwrite: true
-            }
-        );
+        if (!imagem_base64 || !produto_id) {
+            return res.status(400).json({ error: 'Imagem e ID do produto são obrigatórios.' });
+        }
 
+        // Extrai o tipo de imagem (ex: 'jpeg') e os dados da string base64
+        const matches = imagem_base64.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) {
+            return res.status(400).json({ error: 'Formato de imagem base64 inválido.' });
+        }
+
+        const imageType = matches[1];
+        const imageBuffer = Buffer.from(matches[2], 'base64');
+        const imageName = `produto_${produto_id}.${imageType}`;
+        const imagePath = path.join(uploadsDir, imageName);
+
+        // Salva o arquivo no disco
+        fs.writeFileSync(imagePath, imageBuffer);
+
+        // Cria a URL pública para a imagem
+        const imageUrl = `/uploads/${imageName}`; // Ex: /uploads/produto_65a5b...f.jpeg
+
+        // Atualiza o produto no banco de dados com a URL local
+        const db = await connectToDb();
         await db.collection('produtos').updateOne(
-            { _id: new ObjectId(produto_id) }, // Filtro para encontrar o produto pelo seu _id
-            { $set: { // Operador para atualizar os campos
-                imagem_url: result.secure_url, 
-                imagem_public_id: result.public_id 
-            }}
+            { _id: new ObjectId(produto_id) },
+            { $set: { imagem_url: imageUrl } }
         );
 
-        res.status(200).json({
-            success: true,
-            imagem_url: result.secure_url,
-            public_id: result.public_id,
-            message: 'Imagem enviada com sucesso!'
-        });
+        res.status(200).json({ success: true, imagem_url: imageUrl, message: 'Imagem salva localmente com sucesso!' });
 
     } catch (error) {
-        console.error(`❌ Erro no upload: ${error.message}`);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
@@ -205,6 +196,9 @@ app.post('/api/upload-imagem', async (req, res) => {
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
+
+// Adiciona o middleware de tratamento de erros no final, depois de todas as rotas
+app.use(errorHandler);
 
 // --- INICIALIZAÇÃO DO SERVIDOR ---
 
@@ -214,7 +208,7 @@ async function startServer() {
         console.log("🚀 GRAÇA PRESENTES - Servidor Node.js Iniciado!");
         console.log(`📍 URL: http://localhost:${PORT}`);
         console.log("💾 Banco de dados: MongoDB");
-        console.log("☁️ Cloudinary:", CLOUDINARY_AVAILABLE ? "✅ Disponível" : "❌ Não instalado");
+        console.log("🖼️  Upload de Imagens: Local (pasta /uploads)");
         console.log("⏹️ Para parar: Ctrl+C");
         console.log("=" * 60);
     });

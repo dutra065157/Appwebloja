@@ -463,59 +463,6 @@
     </footer>
 
     <script>
-        // Sistema de Armazenamento de Produtos (compatível com admin.html)
-        class ProdutoDatabase {
-            constructor() {
-                this.chaveStorage = 'graca_presentes_produtos';
-                this.chaveImagens = 'graca_presentes_imagens';
-            }
-
-            obterProdutos() {
-                try {
-                    const produtos = localStorage.getItem(this.chaveStorage);
-                    return produtos ? JSON.parse(produtos) : [];
-                } catch (error) {
-                    console.error('Erro ao obter produtos:', error);
-                    return [];
-                }
-            }
-
-            obterImagens() {
-                try {
-                    const imagens = localStorage.getItem(this.chaveImagens);
-                    return imagens ? JSON.parse(imagens) : {};
-                } catch (error) {
-                    console.error('Erro ao obter imagens:', error);
-                    return {};
-                }
-            }
-
-            obterProdutosEmDestaque() {
-                const produtos = this.obterProdutos();
-                
-                // Primeiro tenta produtos marcados como mais vendidos
-                const maisVendidos = produtos.filter(p => p.maisVendido);
-                
-                if (maisVendidos.length >= 4) {
-                    return maisVendidos.slice(0, 4);
-                }
-                
-                // Se não tiver 4 mais vendidos, completa com produtos novos
-                const novos = produtos.filter(p => p.novo && !maisVendidos.some(mv => mv.id === p.id));
-                
-                if (maisVendidos.length + novos.length >= 4) {
-                    return [...maisVendidos, ...novos].slice(0, 4);
-                }
-                
-                // Se ainda não tiver 4, completa com os primeiros produtos
-                const outros = produtos
-                    .filter(p => !maisVendidos.some(mv => mv.id === p.id) && !novos.some(n => n.id === p.id))
-                    .slice(0, 4 - (maisVendidos.length + novos.length));
-                
-                return [...maisVendidos, ...novos, ...outros].slice(0, 4);
-            }
-        }
-
         // Classe Carrinho (compatível com produtos.html)
         class Carrinho {
             constructor() {
@@ -591,7 +538,6 @@
         }
 
         // Inicializar sistema
-        const produtoDB = new ProdutoDatabase();
         const carrinho = new Carrinho();
         let produtosEmDestaque = [];
 
@@ -704,12 +650,25 @@
         }
 
         // Carregar produtos em destaque
-        function carregarProdutosEmDestaque() {
+        async function carregarProdutosEmDestaque() {
+            const container = document.getElementById('featured-products');
             try {
-                produtosEmDestaque = produtoDB.obterProdutosEmDestaque();
-                const imagens = produtoDB.obterImagens();
+                const response = await fetch('/api/produtos');
+                if (!response.ok) {
+                    throw new Error(`Erro na API: ${response.statusText}`);
+                }
+                const todosProdutos = await response.json();
+
+                // Lógica para selecionar produtos em destaque (mesma que antes, mas com dados da API)
+                const maisVendidos = todosProdutos.filter(p => p.mais_vendido);
+                const novos = todosProdutos.filter(p => p.novo && !maisVendidos.some(mv => mv.id === p.id));
+                const outros = todosProdutos
+                    .filter(p => !maisVendidos.some(mv => mv.id === p.id) && !novos.some(n => n.id === p.id));
                 
-                const container = document.getElementById('featured-products');
+                produtosEmDestaque = [...maisVendidos, ...novos, ...outros].slice(0, 4);
+
+                // A URL da imagem já vem correta do backend, não precisamos mais do localStorage de imagens.
+                // const imagens = {}; // Não é mais necessário
                 
                 if (produtosEmDestaque.length === 0) {
                     container.innerHTML = `
@@ -730,8 +689,8 @@
                 }
                 
                 container.innerHTML = produtosEmDestaque.map((produto, index) => {
-                    const temImagem = produto.imagem_url || imagens[produto.id];
-                    const imagemSrc = produto.imagem_url || imagens[produto.id];
+                    const temImagem = !!produto.imagem_url;
+                    const imagemSrc = produto.imagem_url;
                     
                     // Determinar badges
                     const badges = [];
@@ -743,14 +702,14 @@
                             </div>
                         `);
                     }
-                    if (produto.novo) {
+                    if (produto.novo && !badges.length) { // Mostra 'Novo' apenas se não tiver outro badge
                         badges.push(`
                             <div class="absolute top-3 right-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs px-2 py-1 rounded-full shadow-lg z-10">
                                 Novo
                             </div>
                         `);
                     }
-                    if (produto.maisVendido) {
+                    if (produto.mais_vendido && !badges.length) { // Mostra 'Mais Vendido' apenas se não tiver outro badge
                         badges.push(`
                             <div class="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-lg z-10">
                                 🔥 Mais Vendido
@@ -760,8 +719,8 @@
 
                     // Calcular preço com desconto
                     const precoFinal = produto.desconto && produto.desconto > 0 
-                        ? produto.preco * (1 - produto.desconto / 100)
-                        : produto.preco;
+                        ? parseFloat(produto.preco) * (1 - parseFloat(produto.desconto) / 100)
+                        : parseFloat(produto.preco);
 
                     return `
                     <div class="product-card group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-gray-100 animate-fade-in-up"
@@ -772,8 +731,8 @@
                                 `<img src="${imagemSrc}" 
                                       alt="${produto.nome}" 
                                       class="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500">` :
-                                `<div class="w-full h-48 ${produto.corGradiente || 'from-gray-400 to-gray-600'} bg-gradient-to-br flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
-                                    <i data-feather="${produto.icone || 'gift'}" class="w-16 h-16 text-white"></i>
+                                `<div class="w-full h-48 ${produto.cor_gradiente || 'from-gray-400 to-gray-600'} bg-gradient-to-br flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+                                    <i data-feather="${produto.icone || 'gift'}" class="w-16 h-16 text-white opacity-75"></i>
                                 </div>`
                             }
                             
@@ -805,9 +764,9 @@
                                     <span class="font-bold text-xl text-pink-500">
                                         R$ ${precoFinal.toFixed(2).replace('.', ',')}
                                     </span>
-                                    ${produto.precoOriginal && produto.precoOriginal > precoFinal ? 
+                                    ${produto.preco_original && parseFloat(produto.preco_original) > precoFinal ? 
                                         `<span class="text-xs text-gray-400 line-through">
-                                            De: R$ ${produto.precoOriginal.toFixed(2).replace('.', ',')}
+                                            De: R$ ${parseFloat(produto.preco_original).toFixed(2).replace('.', ',')}
                                         </span>` : 
                                         ''}
                                 </div>
@@ -827,7 +786,7 @@
                 // Adicionar eventos aos botões de adicionar ao carrinho
                 document.querySelectorAll('.add-to-cart').forEach(button => {
                     button.addEventListener('click', function() {
-                        const produtoId = parseInt(this.getAttribute('data-produto-id'));
+                        const produtoId = this.getAttribute('data-produto-id');
                         const produto = produtosEmDestaque.find(p => p.id === produtoId);
                         if (produto) {
                             carrinho.adicionarItem(produto);
@@ -851,7 +810,6 @@
                 
             } catch (error) {
                 console.error('Erro ao carregar produtos em destaque:', error);
-                const container = document.getElementById('featured-products');
                 container.innerHTML = `
                     <div class="col-span-full text-center py-12">
                         <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -868,16 +826,6 @@
                 feather.replace();
             }
         }
-
-        // Adicionar evento para atualizar produtos quando carrinho for atualizado
-        window.addEventListener('storage', function(e) {
-            if (e.key === 'graca_presentes_produtos') {
-                carregarProdutosEmDestaque();
-            }
-            if (e.key === 'carrinho') {
-                carrinho.atualizarContador();
-            }
-        });
 
         // Permitir recarregar produtos manualmente (útil para testes)
         window.recarregarProdutos = function() {
