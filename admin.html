@@ -212,229 +212,6 @@
         // Variável para armazenar a imagem em Base64
         let imagemBase64 = null;
 
-        // Sistema de Armazenamento de Produtos com Suporte a Imagens
-        class ProdutoDatabase {
-            constructor() {
-                this.chaveStorage = 'graca_presentes_produtos';
-                this.chaveImagens = 'graca_presentes_imagens';
-                this.inicializarDadosPadrao();
-            }
-
-            inicializarDadosPadrao() {
-                const produtos = this.obterProdutos();
-                
-                // Se não houver produtos, inicializar com alguns exemplos
-                if (produtos.length === 0) {
-                    const produtosPadrao = [
-                        {
-                            id: 1,
-                            nome: "Buquê de Rosas Vermelhas Premium",
-                            descricao: "12 rosas vermelhas frescas importadas com embalagem especial",
-                            preco: 129.90,
-                            precoOriginal: 149.90,
-                            categoria: "Flores",
-                            desconto: 13,
-                            novo: true,
-                            maisVendido: true,
-                            cor: "pink",
-                            icone: "sun",
-                            corGradiente: "from-pink-200 to-rose-300",
-                            imagem_url: "" // Imagem vazia por padrão
-                        },
-                        {
-                            id: 2,
-                            nome: "Kit Café Gourmet",
-                            descricao: "Grãos especiais selecionados + 2 canecas cerâmicas artesanais",
-                            preco: 159.90,
-                            precoOriginal: 179.90,
-                            categoria: "Kits",
-                            desconto: 11,
-                            novo: false,
-                            maisVendido: false,
-                            cor: "amber",
-                            icone: "coffee",
-                            corGradiente: "from-amber-200 to-orange-300",
-                            imagem_url: ""
-                        },
-                        {
-                            id: 3,
-                            nome: "Caixa de Chocolates Belgas",
-                            descricao: "24 chocolates finos importados da Bélgica em embalagem premium",
-                            preco: 89.90,
-                            precoOriginal: 99.90,
-                            categoria: "Doces",
-                            desconto: 10,
-                            novo: false,
-                            maisVendido: true,
-                            cor: "yellow",
-                            icone: "box",
-                            corGradiente: "from-yellow-200 to-amber-300",
-                            imagem_url: ""
-                        }
-                    ];
-                    
-                    this.salvarProdutos(produtosPadrao);
-                }
-            }
-
-            obterProdutos() {
-                try {
-                    const produtos = localStorage.getItem(this.chaveStorage);
-                    return produtos ? JSON.parse(produtos) : [];
-                } catch (error) {
-                    console.error('Erro ao obter produtos:', error);
-                    return [];
-                }
-            }
-
-            salvarProdutos(produtos) {
-                try {
-                    localStorage.setItem(this.chaveStorage, JSON.stringify(produtos));
-                    return true;
-                } catch (error) {
-                    console.error('Erro ao salvar produtos:', error);
-                    return false;
-                }
-            }
-
-            adicionarProduto(produto) {
-                const produtos = this.obterProdutos();
-                
-                // Gerar novo ID
-                const novoId = produtos.length > 0 
-                    ? Math.max(...produtos.map(p => p.id)) + 1 
-                    : 1;
-                
-                const novoProduto = {
-                    ...produto,
-                    id: novoId,
-                    dataCadastro: new Date().toISOString(),
-                    // Garantir que temos as propriedades necessárias
-                    cor: produto.cor || this.obterCorPorCategoria(produto.categoria),
-                    icone: produto.icone || this.obterIconePorCategoria(produto.categoria),
-                    corGradiente: produto.corGradiente || this.obterGradientePorCategoria(produto.categoria)
-                };
-                
-                produtos.push(novoProduto);
-                this.salvarProdutos(produtos);
-                return novoProduto;
-            }
-
-            // Salvar imagem separadamente para evitar problemas de tamanho
-            salvarImagem(produtoId, base64Data) {
-                try {
-                    const imagens = this.obterImagens();
-                    imagens[produtoId] = base64Data;
-                    localStorage.setItem(this.chaveImagens, JSON.stringify(imagens));
-                    
-                    // Atualizar URL da imagem no produto
-                    const produtos = this.obterProdutos();
-                    const produtoIndex = produtos.findIndex(p => p.id === produtoId);
-                    if (produtoIndex !== -1) {
-                        produtos[produtoIndex].imagem_url = base64Data;
-                        this.salvarProdutos(produtos);
-                    }
-                    
-                    return true;
-                } catch (error) {
-                    console.error('Erro ao salvar imagem:', error);
-                    return false;
-                }
-            }
-
-            obterImagens() {
-                try {
-                    const imagens = localStorage.getItem(this.chaveImagens);
-                    return imagens ? JSON.parse(imagens) : {};
-                } catch (error) {
-                    console.error('Erro ao obter imagens:', error);
-                    return {};
-                }
-            }
-
-            obterCorPorCategoria(categoria) {
-                const cores = {
-                    'Flores': 'pink',
-                    'Doces': 'yellow',
-                    'Pelúcias': 'purple',
-                    'Cosméticos': 'rose',
-                    'Kits': 'amber',
-                    'Decoração': 'blue',
-                    'Joias': 'green',
-                    'Românticos': 'rose'
-                };
-                return cores[categoria] || 'gray';
-            }
-
-            obterIconePorCategoria(categoria) {
-                const icones = {
-                    'Flores': 'sun',
-                    'Doces': 'box',
-                    'Pelúcias': 'heart',
-                    'Cosméticos': 'star',
-                    'Kits': 'package',
-                    'Decoração': 'home',
-                    'Joias': 'award',
-                    'Românticos': 'heart'
-                };
-                return icones[categoria] || 'gift';
-            }
-
-            obterGradientePorCategoria(categoria) {
-                const gradientes = {
-                    'Flores': 'from-pink-200 to-rose-300',
-                    'Doces': 'from-yellow-200 to-amber-300',
-                    'Pelúcias': 'from-purple-200 to-pink-300',
-                    'Cosméticos': 'from-rose-200 to-pink-300',
-                    'Kits': 'from-amber-200 to-orange-300',
-                    'Decoração': 'from-blue-200 to-cyan-300',
-                    'Joias': 'from-green-200 to-emerald-300',
-                    'Românticos': 'from-rose-200 to-red-300'
-                };
-                return gradientes[categoria] || 'from-gray-400 to-gray-600';
-            }
-
-            removerProduto(id) {
-                const produtos = this.obterProdutos();
-                const produtosFiltrados = produtos.filter(p => p.id !== id);
-                
-                // Remover imagem associada
-                const imagens = this.obterImagens();
-                delete imagens[id];
-                localStorage.setItem(this.chaveImagens, JSON.stringify(imagens));
-                
-                return this.salvarProdutos(produtosFiltrados);
-            }
-
-            exportarDados() {
-                const produtos = this.obterProdutos();
-                const imagens = this.obterImagens();
-                
-                const dados = {
-                    produtos: produtos,
-                    imagens: imagens,
-                    dataExportacao: new Date().toISOString(),
-                    totalProdutos: produtos.length
-                };
-                
-                const dadosString = JSON.stringify(dados, null, 2);
-                const blob = new Blob([dadosString], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `produtos_graca_presentes_${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                return true;
-            }
-        }
-
-        const produtoDB = new ProdutoDatabase();
-
         // Funções para manipulação de imagem
         function previewImagem(event) {
             const file = event.target.files[0];
@@ -480,51 +257,62 @@
         });
 
         // Cadastrar produto
-        document.getElementById('produtoForm').addEventListener('submit', function(e) {
+        document.getElementById('produtoForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const button = this.querySelector('button[type="submit"]');
             const originalText = button.innerHTML;
             button.innerHTML = '⏳ Cadastrando...';
             button.disabled = true;
-
+            
             const formData = new FormData(this);
             const produtoData = {
                 nome: formData.get('nome'),
                 preco: parseFloat(formData.get('preco')),
-                precoOriginal: formData.get('precoOriginal') ? parseFloat(formData.get('precoOriginal')) : null,
+                preco_original: formData.get('precoOriginal') ? parseFloat(formData.get('precoOriginal')) : null,
                 categoria: formData.get('categoria'),
                 descricao: formData.get('descricao'),
                 desconto: parseInt(formData.get('desconto') || 0),
                 novo: document.getElementById('novo').checked,
-                maisVendido: document.getElementById('maisVendido').checked,
-                imagem_url: "" // Será preenchida depois se houver imagem
+                mais_vendido: document.getElementById('maisVendido').checked
             };
 
             try {
-                // 1. Cadastrar produto
-                const novoProduto = produtoDB.adicionarProduto(produtoData);
-                
-                if (novoProduto) {
-                    // 2. Se tem imagem, salvar separadamente
-                    if (imagemBase64) {
-                        produtoDB.salvarImagem(novoProduto.id, imagemBase64);
-                    }
-                    
-                    // Mostrar feedback
-                    mostrarFeedback('✅ Produto cadastrado com sucesso!', 'success');
-                    
-                    // Resetar formulário
-                    this.reset();
-                    removerImagem();
-                    document.getElementById('novo').checked = false;
-                    document.getElementById('maisVendido').checked = false;
-                    
-                    // Recarregar lista
-                    carregarProdutos();
-                } else {
-                    mostrarFeedback('❌ Erro ao cadastrar produto', 'error');
+                // 1. Enviar dados do produto para a API
+                const response = await fetch('/api/produtos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(produtoData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Falha ao cadastrar produto');
                 }
+
+                const result = await response.json();
+                const produtoId = result.produto_id;
+
+                // 2. Se houver imagem, enviar para a API de upload
+                if (imagemBase64) {
+                    const uploadResponse = await fetch('/api/upload-imagem', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            produto_id: produtoId,
+                            imagem_base64: imagemBase64
+                        })
+                    });
+                    if (!uploadResponse.ok) {
+                        throw new Error('Produto cadastrado, mas falha ao enviar imagem.');
+                    }
+                }
+
+                mostrarFeedback('✅ Produto cadastrado com sucesso!', 'success');
+                this.reset();
+                removerImagem();
+                carregarProdutos();
+
             } catch (error) {
                 console.error('Erro ao cadastrar produto:', error);
                 mostrarFeedback('❌ Erro ao cadastrar produto: ' + error.message, 'error');
@@ -570,14 +358,17 @@
         }
 
         // Carregar produtos
-        function carregarProdutos() {
+        async function carregarProdutos() {
+            const lista = document.getElementById('listaProdutos');
             try {
-                const produtos = produtoDB.obterProdutos();
-                const imagens = produtoDB.obterImagens();
+                const response = await fetch('/api/produtos');
+                if (!response.ok) throw new Error('Falha ao buscar produtos');
+                
+                const produtos = await response.json();
                 
                 document.getElementById('totalProdutos').textContent = `${produtos.length} produto${produtos.length !== 1 ? 's' : ''}`;
                 
-                const lista = document.getElementById('listaProdutos');
+                
                 
                 if (produtos.length === 0) {
                     lista.innerHTML = `
@@ -591,18 +382,18 @@
                 }
                 
                 lista.innerHTML = produtos.map(produto => {
-                    const temImagem = imagens[produto.id] || produto.imagem_url;
+                    const temImagem = !!produto.imagem_url;
                     
                     return `
                     <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition group">
                         <div class="flex items-center space-x-4">
                             ${temImagem ? 
                                 `<div class="w-20 h-20 flex-shrink-0">
-                                    <img src="${imagens[produto.id] || produto.imagem_url}" 
+                                    <img src="${produto.imagem_url}" 
                                          class="w-full h-full object-cover rounded-lg shadow-sm"
                                          alt="${produto.nome}">
                                 </div>` :
-                                `<div class="w-20 h-20 ${produto.corGradiente || 'bg-gray-100'} rounded-lg flex items-center justify-center flex-shrink-0">
+                                `<div class="w-20 h-20 ${produto.cor_gradiente || 'bg-gray-100'} rounded-lg flex items-center justify-center flex-shrink-0">
                                     <i data-feather="${produto.icone || 'gift'}" class="w-8 h-8 text-white"></i>
                                 </div>`
                             }
@@ -612,7 +403,7 @@
                                         <h3 class="font-semibold text-lg text-gray-800">${produto.nome}</h3>
                                         <p class="text-gray-600 text-sm mt-1 line-clamp-2">${produto.descricao || 'Sem descrição'}</p>
                                     </div>
-                                    <button onclick="removerProduto(${produto.id})" 
+                                    <button onclick="removerProduto('${produto.id}')" 
                                             class="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
                                             title="Remover produto">
                                         <i data-feather="trash-2" class="w-4 h-4"></i>
@@ -620,15 +411,15 @@
                                 </div>
                                 <div class="flex items-center space-x-4 mt-2">
                                     <span class="text-pink-600 font-bold">R$ ${produto.preco.toFixed(2)}</span>
-                                    <span class="text-sm text-gray-500">${produto.categoria}</span>
+                                    <span class="bg-${produto.cor || 'gray'}-100 text-${produto.cor || 'gray'}-600 text-xs px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0">${produto.categoria}</span>
                                     ${produto.desconto > 0 ? 
                                         `<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">${produto.desconto}% OFF</span>` : ''}
                                 </div>
                                 <div class="flex space-x-2 mt-2">
                                     ${produto.novo ? '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">Novo</span>' : ''}
-                                    ${produto.maisVendido ? '<span class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">Mais Vendido</span>' : ''}
+                                    ${produto.mais_vendido ? '<span class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">Mais Vendido</span>' : ''}
                                     <span class="text-xs text-gray-400">
-                                        ID: ${produto.id}
+                                        ID: ${produto.id.slice(-6)}
                                     </span>
                                 </div>
                             </div>
@@ -640,29 +431,37 @@
                 feather.replace();
             } catch (error) {
                 console.error('Erro ao carregar produtos:', error);
-                const lista = document.getElementById('listaProdutos');
                 lista.innerHTML = '<p class="text-red-500 text-center">Erro ao carregar produtos</p>';
             }
         }
 
-        function removerProduto(id) {
+        async function removerProduto(id) {
             if (confirm('Tem certeza que deseja remover este produto?')) {
-                const sucesso = produtoDB.removerProduto(id);
-                if (sucesso) {
-                    mostrarFeedback('✅ Produto removido com sucesso!', 'success');
-                    carregarProdutos();
-                } else {
-                    mostrarFeedback('❌ Erro ao remover produto', 'error');
-                }
+                // Futuramente, criar uma rota DELETE /api/produtos/:id no backend
+                // Por enquanto, vamos apenas avisar o usuário.
+                mostrarFeedback('Funcionalidade de remoção ainda não implementada no backend.', 'info');
             }
         }
 
-        function exportarProdutos() {
-            const sucesso = produtoDB.exportarDados();
-            if (sucesso) {
-                mostrarFeedback('✅ Produtos exportados com sucesso!', 'success');
-            } else {
-                mostrarFeedback('❌ Erro ao exportar produtos', 'error');
+        async function exportarProdutos() {
+            try {
+                const response = await fetch('/api/produtos');
+                if (!response.ok) throw new Error('Falha ao buscar produtos para exportação');
+                const produtos = await response.json();
+
+                const dadosString = JSON.stringify(produtos, null, 2);
+                const blob = new Blob([dadosString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `produtos_graca_presentes_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                mostrarFeedback(`❌ ${error.message}`, 'error');
             }
         }
 
