@@ -39,7 +39,7 @@ const errorHandler = (err, req, res, next) => {
 // --- ROTAS DA API ---
 
 // Rota de Health Check
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', async (req, res, next) => {
     try {
         const db = getDb();
         const products_count = await db.collection('produtos').countDocuments();
@@ -59,7 +59,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Rota para buscar todos os produtos
-app.get('/api/produtos', async (req, res) => {
+app.get('/api/produtos', async (req, res, next) => {
     try {
         const db = getDb();
         // O frontend espera um campo 'id', então vamos mapear o '_id' do MongoDB para 'id'.
@@ -71,7 +71,7 @@ app.get('/api/produtos', async (req, res) => {
 });
 
 // Rota para cadastrar um novo produto
-app.post('/api/produtos', async (req, res) => {
+app.post('/api/produtos', async (req, res, next) => {
     try {
         const db = getDb();
         const p = req.body;
@@ -108,7 +108,7 @@ app.post('/api/produtos', async (req, res) => {
 });
 
 // Rota para buscar todos os pedidos
-app.get('/api/pedidos', async (req, res) => {
+app.get('/api/pedidos', async (req, res, next) => {
     try {
         const db = getDb();
         const pedidos = await db.collection('pedidos').find().sort({ dataCriacao: -1 }).toArray();
@@ -119,7 +119,7 @@ app.get('/api/pedidos', async (req, res) => {
 });
 
 // Rota para criar um novo pedido
-app.post('/api/pedidos', async (req, res) => {
+app.post('/api/pedidos', async (req, res, next) => {
     try {
         const db = getDb();
         const { cliente, itens, total } = req.body;
