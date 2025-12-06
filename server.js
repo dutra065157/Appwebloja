@@ -1,10 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs'); // 👈 Adicionado para manipular arquivos
+const fs = require('fs');
 require('dotenv').config(); // Garante que as variáveis de ambiente sejam carregadas
-const { connectToDb } = require('./database');
-const { ObjectId } = require('mongodb'); // Importante para buscar por ID
+const getDb = require('./database'); // Alterado para o novo padrão de conexão
+const { ObjectId } = require('mongodb');
 
 // Configuração
 const PORT = process.env.PORT || 8000;
@@ -19,7 +19,7 @@ const WHATSAPP_CONFIG = {
 
 // Middlewares
 app.use(cors()); // Habilita CORS para todas as rotas
-app.use(express.json({ limit: '10mb' })); // Permite receber JSON no corpo das requisições
+app.use(express.json({ limit: '10mb' })); // Aumenta o limite para receber imagens em base64
 
 // 📁 Servir a pasta de uploads como estática
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -29,7 +29,7 @@ if (!fs.existsSync(uploadsDir)) {
 app.use('/uploads', express.static(uploadsDir));
 app.use(express.static(__dirname)); // Serve arquivos estáticos (html, css, js) da pasta raiz
 
-// Middleware de tratamento de erros (opcional, mas recomendado)
+// Middleware de tratamento de erros
 const errorHandler = (err, req, res, next) => {
     console.error(`❌ Erro Inesperado: ${err.message}`);
     console.error(err.stack);
@@ -41,7 +41,7 @@ const errorHandler = (err, req, res, next) => {
 // Rota de Health Check
 app.get('/api/health', async (req, res) => {
     try {
-        const db = await connectToDb();
+        const db = getDb();
         const products_count = await db.collection('produtos').countDocuments();
         res.status(200).json({
             status: 'OK',
@@ -61,10 +61,10 @@ app.get('/api/health', async (req, res) => {
 // Rota para buscar todos os produtos
 app.get('/api/produtos', async (req, res) => {
     try {
-        const db = await connectToDb();
-        // No MongoDB, o ID é `_id`. Vamos renomeá-lo para `id` para manter a compatibilidade com o frontend.
+        const db = getDb();
+        // O frontend espera um campo 'id', então vamos mapear o '_id' do MongoDB para 'id'.
         const produtos = await db.collection('produtos').find().sort({ createdAt: -1 }).toArray();
-        res.status(200).json(produtos.map(p => ({ ...p, id: p._id })));
+        res.status(200).json(produtos.map(p => ({ ...p, id: p._id }))); // Mantém compatibilidade
     } catch (error) {
         next(error);
     }
@@ -73,23 +73,28 @@ app.get('/api/produtos', async (req, res) => {
 // Rota para cadastrar um novo produto
 app.post('/api/produtos', async (req, res) => {
     try {
-        const db = await connectToDb();
+        const db = getDb();
         const p = req.body;
+
+        // Lógica para definir ícone e gradiente com base na categoria
+        const categoryStyles = getCategoryStyles(p.categoria);
+
         const newProduct = {
             nome: p.nome,
             preco: p.preco,
             preco_original: p.preco_original,
             categoria: p.categoria,
             descricao: p.descricao,
-            imagem_url: p.imagem_url,
-            icone: p.icone || 'box',
-            cor: p.cor || 'gray',
-            cor_gradiente: p.cor_gradiente || 'from-gray-400 to-gray-600',
+            imagem_url: null, // A imagem será adicionada depois
+            icone: categoryStyles.icone,
+            cor: categoryStyles.cor,
+            cor_gradiente: categoryStyles.cor_gradiente,
             desconto: p.desconto || 0,
             novo: p.novo || false,
             mais_vendido: p.mais_vendido || false,
             createdAt: new Date() // Adicionamos a data de criação
         };
+
         const result = await db.collection('produtos').insertOne(newProduct);
 
         res.status(200).json({
@@ -105,7 +110,7 @@ app.post('/api/produtos', async (req, res) => {
 // Rota para buscar todos os pedidos
 app.get('/api/pedidos', async (req, res) => {
     try {
-        const db = await connectToDb();
+        const db = getDb();
         const pedidos = await db.collection('pedidos').find().sort({ dataCriacao: -1 }).toArray();
         res.status(200).json(pedidos.map(p => ({ ...p, id: p._id })));
     } catch (error) {
@@ -116,7 +121,7 @@ app.get('/api/pedidos', async (req, res) => {
 // Rota para criar um novo pedido
 app.post('/api/pedidos', async (req, res) => {
     try {
-        const db = await connectToDb();
+        const db = getDb();
         const { cliente, itens, total } = req.body;
 
         if (!cliente || !cliente.nome) {
@@ -153,6 +158,7 @@ app.post('/api/pedidos', async (req, res) => {
 });
 
 // Rota para upload de imagem
+// Esta rota agora salva o arquivo localmente e atualiza o produto no DB.
 app.post('/api/upload-imagem', async (req, res, next) => {
     try {
         const { imagem_base64, produto_id } = req.body;
@@ -175,17 +181,17 @@ app.post('/api/upload-imagem', async (req, res, next) => {
         // Salva o arquivo no disco
         fs.writeFileSync(imagePath, imageBuffer);
 
-        // Cria a URL pública para a imagem
+        // Cria a URL pública para a imagem (ex: /uploads/produto_65a5b...f.jpeg)
         const imageUrl = `/uploads/${imageName}`; // Ex: /uploads/produto_65a5b...f.jpeg
 
         // Atualiza o produto no banco de dados com a URL local
-        const db = await connectToDb();
+        const db = getDb();
         await db.collection('produtos').updateOne(
             { _id: new ObjectId(produto_id) },
             { $set: { imagem_url: imageUrl } }
         );
 
-        res.status(200).json({ success: true, imagem_url: imageUrl, message: 'Imagem salva localmente com sucesso!' });
+        res.status(200).json({ success: true, imagem_url: imageUrl, message: 'Imagem salva com sucesso!' });
 
     } catch (error) {
         next(error);
@@ -202,16 +208,26 @@ app.use(errorHandler);
 
 // --- INICIALIZAÇÃO DO SERVIDOR ---
 
-async function startServer() {
-    await connectToDb(); // Garante que a conexão com o DB está pronta
-    app.listen(PORT, () => {
-        console.log("🚀 GRAÇA PRESENTES - Servidor Node.js Iniciado!");
-        console.log(`📍 URL: http://localhost:${PORT}`);
-        console.log("💾 Banco de dados: MongoDB");
-        console.log("🖼️  Upload de Imagens: Local (pasta /uploads)");
-        console.log("⏹️ Para parar: Ctrl+C");
-        console.log("=" * 60);
-    });
-}
+app.listen(PORT, () => {
+    console.log("🚀 GRAÇA PRESENTES - Servidor Node.js Iniciado!");
+    console.log(`📍 URL: http://localhost:${PORT}`);
+    console.log("💾 Banco de dados: MongoDB");
+    console.log("🖼️  Upload de Imagens: Local (pasta /uploads)");
+    console.log("⏹️ Para parar: Ctrl+C");
+    console.log("=" * 60);
+});
 
-startServer().catch(e => console.error("❌ Falha ao iniciar o servidor:", e));
+// Função auxiliar para estilos de categoria
+function getCategoryStyles(categoria) {
+    const styles = {
+        'Flores': { cor: 'pink', icone: 'sun', cor_gradiente: 'from-pink-200 to-rose-300' },
+        'Doces': { cor: 'yellow', icone: 'box', cor_gradiente: 'from-yellow-200 to-amber-300' },
+        'Pelúcias': { cor: 'purple', icone: 'heart', cor_gradiente: 'from-purple-200 to-pink-300' },
+        'Cosméticos': { cor: 'rose', icone: 'star', cor_gradiente: 'from-rose-200 to-pink-300' },
+        'Kits': { cor: 'amber', icone: 'package', cor_gradiente: 'from-amber-200 to-orange-300' },
+        'Decoração': { cor: 'blue', icone: 'home', cor_gradiente: 'from-blue-200 to-cyan-300' },
+        'Joias': { cor: 'green', icone: 'award', cor_gradiente: 'from-green-200 to-emerald-300' },
+        'Românticos': { cor: 'rose', icone: 'heart', cor_gradiente: 'from-rose-200 to-red-300' }
+    };
+    return styles[categoria] || { cor: 'gray', icone: 'gift', cor_gradiente: 'from-gray-400 to-gray-600' };
+}

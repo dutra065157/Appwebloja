@@ -365,106 +365,6 @@
     </footer>
 
     <script>
-        // Sistema de Armazenamento de Produtos
-        class ProdutoDatabase {
-            constructor() {
-                this.chaveStorage = 'graca_presentes_produtos';
-                this.chaveImagens = 'graca_presentes_imagens';
-            }
-
-            obterProdutos() {
-                try {
-                    const produtos = localStorage.getItem(this.chaveStorage);
-                    return produtos ? JSON.parse(produtos) : [];
-                } catch (error) {
-                    console.error('Erro ao obter produtos:', error);
-                    return [];
-                }
-            }
-
-            obterImagens() {
-                try {
-                    const imagens = localStorage.getItem(this.chaveImagens);
-                    return imagens ? JSON.parse(imagens) : {};
-                } catch (error) {
-                    console.error('Erro ao obter imagens:', error);
-                    return {};
-                }
-            }
-
-            salvarProdutos(produtos) {
-                try {
-                    localStorage.setItem(this.chaveStorage, JSON.stringify(produtos));
-                    return true;
-                } catch (error) {
-                    console.error('Erro ao salvar produtos:', error);
-                    return false;
-                }
-            }
-
-            adicionarProduto(produto) {
-                const produtos = this.obterProdutos();
-                
-                const novoId = produtos.length > 0 
-                    ? Math.max(...produtos.map(p => p.id)) + 1 
-                    : 1;
-                
-                const novoProduto = {
-                    ...produto,
-                    id: novoId,
-                    cor: produto.cor || this.obterCorPorCategoria(produto.categoria),
-                    icone: produto.icone || this.obterIconePorCategoria(produto.categoria),
-                    corGradiente: produto.corGradiente || this.obterGradientePorCategoria(produto.categoria)
-                };
-                
-                produtos.push(novoProduto);
-                this.salvarProdutos(produtos);
-                return novoProduto;
-            }
-
-            obterCorPorCategoria(categoria) {
-                const cores = {
-                    'Flores': 'pink',
-                    'Doces': 'yellow',
-                    'Pelúcias': 'purple',
-                    'Cosméticos': 'rose',
-                    'Kits': 'amber',
-                    'Decoração': 'blue',
-                    'Joias': 'green',
-                    'Românticos': 'rose'
-                };
-                return cores[categoria] || 'gray';
-            }
-
-            obterIconePorCategoria(categoria) {
-                const icones = {
-                    'Flores': 'sun',
-                    'Doces': 'box',
-                    'Pelúcias': 'heart',
-                    'Cosméticos': 'star',
-                    'Kits': 'package',
-                    'Decoração': 'home',
-                    'Joias': 'award',
-                    'Românticos': 'heart'
-                };
-                return icones[categoria] || 'gift';
-            }
-
-            obterGradientePorCategoria(categoria) {
-                const gradientes = {
-                    'Flores': 'from-pink-200 to-rose-300',
-                    'Doces': 'from-yellow-200 to-amber-300',
-                    'Pelúcias': 'from-purple-200 to-pink-300',
-                    'Cosméticos': 'from-rose-200 to-pink-300',
-                    'Kits': 'from-amber-200 to-orange-300',
-                    'Decoração': 'from-blue-200 to-cyan-300',
-                    'Joias': 'from-green-200 to-emerald-300',
-                    'Românticos': 'from-rose-200 to-red-300'
-                };
-                return gradientes[categoria] || 'from-gray-400 to-gray-600';
-            }
-        }
-
         // Classe Carrinho
         class Carrinho {
             constructor() {
@@ -540,10 +440,8 @@
         }
 
         // Inicializar sistema
-        const produtoDB = new ProdutoDatabase();
         const carrinho = new Carrinho();
         let produtos = [];
-        let imagens = {};
 
         // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
@@ -599,8 +497,8 @@
             }
         }
 
-        // Carregar produtos do localStorage
-        function carregarProdutos() {
+        // Carregar produtos da API
+        async function carregarProdutos() {
             const loadingState = document.getElementById('loading-state');
             const errorState = document.getElementById('error-state');
             const productsGrid = document.getElementById('products-grid');
@@ -612,25 +510,26 @@
             productsGrid.classList.add('hidden');
             emptyState.classList.add('hidden');
 
-            try {
-                setTimeout(() => {
-                    produtos = produtoDB.obterProdutos();
-                    imagens = produtoDB.obterImagens();
-                    
-                    // Esconder loading
-                    loadingState.classList.add('hidden');
-                    
-                    if (produtos.length === 0) {
-                        emptyState.classList.remove('hidden');
-                    } else {
-                        productsGrid.classList.remove('hidden');
-                        renderizarProdutos(produtos);
-                    }
-                }, 800);
-                
+            try {                
+                const response = await fetch('/api/produtos');
+                if (!response.ok) {
+                    throw new Error(`Erro na API: ${response.statusText}`);
+                }
+                produtos = await response.json();
+
+                // Esconder loading
+                loadingState.classList.add('hidden');
+
+                if (produtos.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    productsGrid.classList.remove('hidden');
+                    renderizarProdutos(produtos);
+                }
+
             } catch (error) {
                 console.error('Erro ao carregar produtos:', error);
-                
+
                 loadingState.classList.add('hidden');
                 errorState.classList.remove('hidden');
                 document.getElementById('error-message').textContent = 
@@ -641,10 +540,9 @@
         function renderizarProdutos(produtosParaRenderizar) {
             const container = document.getElementById('products-grid');
             
-            container.innerHTML = produtosParaRenderizar.map((produto, index) => {
-                // Verificar se há imagem para este produto
-                const temImagem = produto.imagem_url || imagens[produto.id];
-                const imagemSrc = produto.imagem_url || imagens[produto.id];
+            container.innerHTML = produtosParaRenderizar.sort((a, b) => a.nome.localeCompare(b.nome)).map((produto, index) => {
+                const temImagem = !!produto.imagem_url;
+                const imagemSrc = produto.imagem_url;
                 
                 // Determinar badges
                 const badges = [];
@@ -656,14 +554,14 @@
                         </div>
                     `);
                 }
-                if (produto.novo) {
+                if (produto.novo && badges.length === 0) {
                     badges.push(`
                         <div class="absolute top-3 right-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs px-2 py-1 rounded-full shadow-lg z-10">
                             Novo
                         </div>
                     `);
                 }
-                if (produto.maisVendido) {
+                if (produto.mais_vendido && badges.length === 0) {
                     badges.push(`
                         <div class="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs px-2 py-1 rounded-full shadow-lg z-10">
                             🔥 Mais Vendido
@@ -673,8 +571,8 @@
 
                 // Calcular preço com desconto
                 const precoFinal = produto.desconto && produto.desconto > 0 
-                    ? produto.preco * (1 - produto.desconto / 100)
-                    : produto.preco;
+                    ? parseFloat(produto.preco) * (1 - parseFloat(produto.desconto) / 100)
+                    : parseFloat(produto.preco);
 
                 return `
                 <div class="product-card group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-gray-100 animate-fade-in-up"
@@ -687,8 +585,8 @@
                             `<img src="${imagemSrc}" 
                                   alt="${produto.nome}" 
                                   class="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500 product-image">` :
-                            `<div class="w-full h-48 ${produto.corGradiente || 'from-gray-400 to-gray-600'} bg-gradient-to-br flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
-                                <i data-feather="${produto.icone || 'gift'}" class="w-16 h-16 text-white"></i>
+                            `<div class="w-full h-48 ${produto.cor_gradiente || 'from-gray-400 to-gray-600'} bg-gradient-to-br flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+                                <i data-feather="${produto.icone || 'gift'}" class="w-16 h-16 text-white opacity-75"></i>
                             </div>`
                         }
                         
@@ -720,14 +618,14 @@
                                 <span class="font-bold text-xl text-pink-500">
                                     R$ ${precoFinal.toFixed(2).replace('.', ',')}
                                 </span>
-                                ${produto.precoOriginal && produto.precoOriginal > precoFinal ? 
+                                ${produto.preco_original && parseFloat(produto.preco_original) > precoFinal ? 
                                     `<span class="text-xs text-gray-400 line-through">
-                                        De: R$ ${produto.precoOriginal.toFixed(2).replace('.', ',')}
+                                        De: R$ ${parseFloat(produto.preco_original).toFixed(2).replace('.', ',')}
                                     </span>` : 
                                     ''}
                             </div>
                             <button class="add-to-cart-btn bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white p-3 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-110 group/btn"
-                                    data-produto-id="${produto.id}"
+                                    data-produto-id="${produto._id}"
                                     aria-label="Adicionar ${produto.nome} ao carrinho">
                                 <i data-feather="plus" class="w-4 h-4 group-hover/btn:rotate-90 transition-transform"></i>
                             </button>
@@ -743,8 +641,8 @@
             // Adicionar eventos aos botões de adicionar ao carrinho
             document.querySelectorAll('.add-to-cart-btn').forEach(button => {
                 button.addEventListener('click', function() {
-                    const produtoId = parseInt(this.getAttribute('data-produto-id'));
-                    const produto = produtos.find(p => p.id === produtoId);
+                    const produtoId = this.getAttribute('data-produto-id');
+                    const produto = produtos.find(p => p._id === produtoId);
                     if (produto) {
                         carrinho.adicionarItem(produto);
                         

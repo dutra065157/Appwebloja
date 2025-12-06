@@ -16,19 +16,20 @@ const client = new MongoClient(uri, {
 
 let db;
 
-async function connectToDb() {
-    if (db) return db;
+async function connect() {
+    if (db) return;
     try {
         await client.connect();
         // O nome do banco de dados é definido na sua connection string, 
         // ou você pode especificá-lo aqui. Ex: client.db("graca_presentes")
         db = client.db(); 
         console.log("✅ Conectado ao MongoDB com sucesso!");
-        return db;
     } catch (error) {
         console.error("❌ Erro ao conectar ao MongoDB", error);
         process.exit(1); // Encerra a aplicação se não conseguir conectar ao DB
     }
 }
 
-module.exports = { connectToDb };
+connect(); // Conecta assim que o módulo é carregado
+
+module.exports = () => db; // Exporta uma função que retorna a instância do DB já conectado
